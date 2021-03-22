@@ -1,0 +1,66 @@
+---
+title: "Data Load"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+#Install packages and load libraries 
+
+#Pastecs for nice, quick summary features of our datasets. 
+install.packages("pastecs", repos = "http://cran.us.r-project.org")
+
+library("readxl")
+library("pastecs")
+library("tidyverse")
+
+```
+
+
+```{r}
+#Read in respective raw data files and save to dataframes.  
+state_policies <- read_excel("~/w203_lab2_group1/data/raw/state_policies.xlsx")
+mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
+demographic <- read.csv("~/w203_lab2_group1/data/raw/demographic_data.csv")
+covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+```
+
+```{r}
+#Start exploring state_policies dataset. 
+head(state_policies)
+
+#Pull out the columns we want for facemask use.
+state_policies <- state_policies[c("STATE", "POSTCODE", "FIPS", "FM_ALL", "FM_ALL2", "FM_END")]
+
+#Need to trim first four rows, but first we'll give better variable names
+state_policies %>%
+  rename(
+    state = STATE, 
+    postcode = POSTCODE, 
+    fips = FIPS, 
+    fm_first_mandate = FM_ALL, 
+    fm_second_mandate = FM_ALL2, 
+    fm_end = FM_END
+    )
+
+#Trim first four rows (describing data)
+state_policies <- state_policies[-1:-4,]
+
+state_policies
+
+#Adjust the date columns to have a properly formatted date.
+```
+
+```{r}
+#Start exploring mobility_report dataset. 
+
+```
+
+```{r}
+#Start exploring demographic dataset. 
+```
+
+```{r}
+#Start exploring covid_cases dataset. 
+```
+
