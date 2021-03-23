@@ -8,10 +8,10 @@ output:
 #Install packages and load libraries 
 
 #Pastecs for nice, quick summary features of our datasets. 
-install.packages("pastecs", repos = "http://cran.us.r-project.org")
+#install.packages("pastecs", repos = "http://cran.us.r-project.org")
 
 library("readxl")
-library("pastecs")
+#library("pastecs")
 library("tidyverse")
 library("openxlsx")
 
@@ -67,16 +67,29 @@ head(mobility_report)
 
 #For state level need sub_region_1 = 'state' and sub_region_2 is blank
 mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
+
+mobility_report
 ```
 
 ```{r}
 #Start exploring demographic dataset. 
 demographic
 
-#Only looking for columns with first row like Percent!!
+#Only looking for columns with column name ending with PE to get percentages by state. 
+demographic <- demographic %>% 
+  dplyr:: select(NAME, ends_with("PE"))
+
+demographic
+
 ```
 
 ```{r}
 #Start exploring covid_cases dataset. 
+covid_cases
+
+covid_cases$date <- as.Date(covid_cases$date)
+
+covid_cases_november <- covid_cases[which(covid_cases$date >= '2020-10-01' & covid_cases$date <= '2020-11-07'),]
+covid_cases_november
 ```
 
