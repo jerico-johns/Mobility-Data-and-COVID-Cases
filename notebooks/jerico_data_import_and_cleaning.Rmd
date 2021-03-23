@@ -1,0 +1,104 @@
+---
+title: "Data Load"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+#Install packages and load libraries 
+
+#Pastecs for nice, quick summary features of our datasets. 
+#install.packages("pastecs", repos = "http://cran.us.r-project.org")
+
+library("readxl")
+#library("pastecs")
+library("tidyverse")
+library("openxlsx")
+
+```
+
+
+```{r}
+#Read in respective raw data files and save to dataframes.  
+state_policies <- read_excel("~/w203_lab2_group1/data/raw/state_policies.xlsx")
+mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
+demographic <- read.csv("~/w203_lab2_group1/data/raw/demographic_data.csv")
+covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+```
+
+```{r}
+#Start exploring and cleaning state_policies dataset. 
+head(state_policies)
+
+#Pull out the columns we want for facemask use.
+state_policies <- state_policies[c("STATE", "POSTCODE", "FIPS", "FM_ALL", "FM_ALL2", "FM_END")]
+
+#Need to trim first four rows, but first we'll give better variable names
+state_policies <- 
+  state_policies %>%
+  rename(
+    state = STATE, 
+    postcode = POSTCODE, 
+    fips = FIPS, 
+    fm_first_mandate = FM_ALL, 
+    fm_second_mandate = FM_ALL2, 
+    fm_end = FM_END
+    )
+state_policies
+
+#Trim first four rows (describing data)
+state_policies <- state_policies[-1:-4,]
+
+
+#Adjust the date columns to have a properly formatted date.
+state_policies$fm_first_mandate <- openxlsx::convertToDate(state_policies$fm_first_mandate)
+state_policies$fm_second_mandate <- openxlsx::convertToDate(state_policies$fm_second_mandate)
+state_policies$fm_end <- openxlsx::convertToDate(state_policies$fm_end)
+
+#Replace all '1899-12-30' with NA
+state_policies[state_policies == '1899-12-30'] <- NA
+
+state_policies
+
+
+```
+
+```{r}
+#Start exploring mobility_report dataset. 
+head(mobility_report)
+
+#For state level need sub_region_1 = 'state' and sub_region_2 is blank
+mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
+
+mobility_report$date <- as.Date(mobility_report$date)
+
+mobility_report <- mobility_report[which(mobility_report$date >= '2020-06-21' & mobility_report$date <= '2020-07-04'),]
+
+mobility_report$day_of_week <- weekdays(as.Date(mobility_report$date))
+
+mobility_report
+
+```
+
+```{r}
+#Start exploring demographic dataset. 
+demographic
+
+#Only looking for columns with column name ending with PE to get percentages by state. 
+demographic <- demographic %>% 
+  dplyr:: select(NAME, ends_with("PE"))
+
+demographic
+
+```
+
+```{r}
+#Start exploring covid_cases dataset. 
+covid_cases
+
+covid_cases$date <- as.Date(covid_cases$date)
+
+covid_cases <- covid_cases[which(covid_cases$date >= '2020-07-12' & covid_cases$date <= '2020-07-25'),]
+covid_cases
+```
+
