@@ -1,0 +1,110 @@
+---
+title: "Data Load"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+#Install packages and load libraries 
+
+#Pastecs for nice, quick summary features of our datasets. 
+#install.packages("pastecs", repos = "http://cran.us.r-project.org")
+
+library("readxl")
+#library("pastecs")
+library("tidyverse")
+library("openxlsx")
+library(dplyr)
+library(zoo)
+```
+
+
+```{r}
+#Read in respective raw data files and save to dataframes.  
+state_policies <- read_excel("~/w203_lab2_group1/data/raw/state_policies.xlsx")
+mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
+demographic <- read.csv("~/w203_lab2_group1/data/raw/demographic_data.csv")
+covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+```
+
+```{r}
+#Start exploring and cleaning state_policies dataset. 
+head(state_policies)
+
+#Pull out the columns we want for facemask use.
+state_policies <- state_policies[c("STATE", "POSTCODE", "FIPS", "FM_ALL", "FM_ALL2", "FM_END")]
+
+#Need to trim first four rows, but first we'll give better variable names
+state_policies <- 
+  state_policies %>%
+  rename(
+    state = STATE, 
+    postcode = POSTCODE, 
+    fips = FIPS, 
+    fm_first_mandate = FM_ALL, 
+    fm_second_mandate = FM_ALL2, 
+    fm_end = FM_END
+    )
+state_policies
+
+#Trim first four rows (describing data)
+state_policies <- state_policies[-1:-4,]
+
+
+#Adjust the date columns to have a properly formatted date.
+state_policies$fm_first_mandate <- openxlsx::convertToDate(state_policies$fm_first_mandate)
+state_policies$fm_second_mandate <- openxlsx::convertToDate(state_policies$fm_second_mandate)
+state_policies$fm_end <- openxlsx::convertToDate(state_policies$fm_end)
+
+#Replace all '1899-12-30' with NA
+state_policies[state_policies == '1899-12-30'] <- NA
+
+
+```
+
+```{r}
+#Start exploring mobility_report dataset. 
+head(mobility_report)
+
+#For state level need sub_region_1 = 'state' and sub_region_2 is blank
+mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
+
+mobility_report
+```
+
+```{r}
+#Start exploring demographic dataset. 
+demographic
+
+#Only looking for columns with column name ending with PE to get percentages by state. 
+demographic <- demographic %>% 
+  dplyr:: select(NAME, ends_with("PE"))
+
+demographic
+
+```
+
+```{r}
+#Start exploring covid_cases dataset. 
+covid_cases
+
+covid_cases$date <- as.Date(covid_cases$date)
+# Add new cases
+covid_cases <- covid_cases %>% group_by(fips) %>% mutate(new_cases=c(NA, diff(cases)))
+
+covid_cases_november <- covid_cases[which(covid_cases$date >= '2020-10-01' & covid_cases$date <= '2020-11-07'),]
+covid_cases_november
+```
+
+
+```{r}
+# Smooth mobility data and look at states
+mob_ny <- mobility_report %>% mutate(date=as.Date(date)) %>% filter(sub_region_1=='New York')
+mob_ny_smooth <- mob_ny %>% group_by(date) %>% summarise(retail_and_recreation=mean(retail_and_recreation_percent_change_from_baseline, na.rm=TRUE)) %>% mutate(retail_and_recreation_smooth=rollmean(x=retail_and_recreation, 7, na.pad=TRUE, align="right"))
+
+covid_ny <- covid_cases %>% filter(state=='New York') %>% mutate(new_cases_smooth=rollmean(x=new_cases, 7, na.pad=TRUE, align="right"))
+joined <- left_join(covid_ny, mob_ny_smooth, by='date')
+
+plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=retail_and_recreation_smooth, color='red')) + geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+plot
+```
