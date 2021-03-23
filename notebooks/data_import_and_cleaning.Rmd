@@ -8,7 +8,7 @@ output:
 #Install packages and load libraries 
 
 #Pastecs for nice, quick summary features of our datasets. 
-install.packages("pastecs", repos = "http://cran.us.r-project.org")
+#install.packages("pastecs", repos = "http://cran.us.r-project.org")
 
 library("readxl")
 library("pastecs")
@@ -67,6 +67,13 @@ head(mobility_report)
 
 #For state level need sub_region_1 = 'state' and sub_region_2 is blank
 mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
+
+mobility_report <- 
+  mobility_report %>%
+  rename(
+    state = sub_region_1) 
+
+
 ```
 
 ```{r}
@@ -78,5 +85,31 @@ demographic
 
 ```{r}
 #Start exploring covid_cases dataset. 
+
+
+head(covid_cases)
+
+#Create dates to compare
+base_date <- as.Date('2020/11/1')
+pre_date = base_date - 14 
+post_date = base_date + 14 
+
+merge_table <- merge(covid_cases, mobility_report, by=c("date","state"))
+
+pre_table <- merge_table %>% filter(date == pre_date)
+
+post_table  <- merge_table %>% filter(date == post_date)
+
+
+
+
+
+hist(pre_table$cases)
+
+hist(post_table$cases)
+
+mobility_report
+
+
 ```
 
