@@ -89,6 +89,8 @@ demographic
 covid_cases
 
 covid_cases$date <- as.Date(covid_cases$date)
+# Add new cases
+covid_cases <- covid_cases %>% group_by(fips) %>% mutate(new_cases=c(NA, diff(cases)))
 
 covid_cases_november <- covid_cases[which(covid_cases$date >= '2020-10-01' & covid_cases$date <= '2020-11-07'),]
 covid_cases_november
@@ -100,6 +102,9 @@ covid_cases_november
 mob_ny <- mobility_report %>% mutate(date=as.Date(date)) %>% filter(sub_region_1=='New York')
 mob_ny_smooth <- mob_ny %>% group_by(date) %>% summarise(retail_and_recreation=mean(retail_and_recreation_percent_change_from_baseline, na.rm=TRUE)) %>% mutate(retail_and_recreation_smooth=rollmean(x=retail_and_recreation, 7, na.pad=TRUE, align="right"))
 
-plot <- mob_ny_smooth %>% ggplot(aes(x=date, y=retail_and_recreation_smooth, group=1)) + geom_line() + scale_x_date(date_labels = "%m")
+covid_ny <- covid_cases %>% filter(state=='New York') %>% mutate(new_cases_smooth=rollmean(x=new_cases, 7, na.pad=TRUE, align="right"))
+joined <- left_join(covid_ny, mob_ny_smooth, by='date')
+
+plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=retail_and_recreation_smooth, color='red')) + geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
 plot
 ```
