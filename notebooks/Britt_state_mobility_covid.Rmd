@@ -1,0 +1,167 @@
+---
+title: "Data Load"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r load libraries, echo=TRUE}
+
+library("readxl")
+library("tidyverse")
+library("openxlsx")
+```
+
+
+```{r load raw data into data frames, echo=TRUE, message=TRUE}
+
+state_policies <- read_excel("state_policies.xlsx")
+mobility_report <- read.csv("mobility_report.csv")
+demographic <- read.csv("demographic_data.csv")
+covid_cases <- read.csv("covid_cases.csv")
+```
+
+```{r clean and format state policies data, echo= TRUE, message=TRUE}
+
+#Pull out the columns we want for face mask use.
+state_policies <- state_policies[c("STATE", "POSTCODE", "FIPS", "FM_ALL", "FM_ALL2", "FM_END")]
+
+#Need to trim first four rows, but first we'll give better variable names
+state_policies <- 
+  state_policies %>%
+  rename(
+    state = STATE, 
+    postcode = POSTCODE, 
+    fips = FIPS, 
+    fm_first_mandate = FM_ALL, 
+    fm_second_mandate = FM_ALL2, 
+    fm_end = FM_END
+    )
+
+#Trim first four rows (describing data)
+state_policies <- state_policies[-1:-4,]
+
+
+#Adjust the date columns to have a properly formatted date.
+state_policies$fm_first_mandate <- openxlsx::convertToDate(state_policies$fm_first_mandate)
+state_policies$fm_second_mandate <- openxlsx::convertToDate(state_policies$fm_second_mandate)
+state_policies$fm_end <- openxlsx::convertToDate(state_policies$fm_end)
+
+#Replace all '1899-12-30' with NA
+state_policies[state_policies == '1899-12-30'] <- NA
+```
+
+```{r clean mobility data, echo=TRUE, message=TRUE}
+
+#For state level need sub_region_1 = 'state' and sub_region_2 is blank
+mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
+
+# Give the state column a meaningful name
+mobility_report <- 
+  mobility_report %>%
+  rename(
+    state = sub_region_1)
+```
+```{r, subset and process mobility data for desired time period, echo=TRUE, message=TRUE}
+
+# Create the time intervals of interest
+pre_mobile_week <- subset(mobility_report, date>="2020-06-21" & date<="2020-06-27")
+mobile_week <- subset(mobility_report, date >= "2020-06-28" & date<="2020-07-04")
+
+# Change the start and post dates to datetime type
+pre_mobile_week$date <- strptime(pre_mobile_week$date, "%Y-%m-%d")
+mobile_week$date <- strptime(mobile_week$date, "%Y-%m-%d")
+
+# Add a column for 7 days after the date for the join
+pre_mobile_week <- pre_mobile_week %>%
+  mutate(post_date = as.Date(date) + 7)
+
+# Rename long columns for ease of calculating differences 
+pre_mobile_week <- pre_mobile_week %>%
+  rename(p1_retail_rec = retail_and_recreation_percent_change_from_baseline,
+         p1_grocery_rx = grocery_and_pharmacy_percent_change_from_baseline,
+         p1_parks = parks_percent_change_from_baseline,
+         p1_transit = transit_stations_percent_change_from_baseline,
+         p1_workplaces = workplaces_percent_change_from_baseline,
+         p1_residential = residential_percent_change_from_baseline)
+
+# Rename the columns of interest in the post dataset
+mobile_week <- mobile_week %>%
+  rename(p2_retail_rec = retail_and_recreation_percent_change_from_baseline,
+         p2_grocery_rx = grocery_and_pharmacy_percent_change_from_baseline,
+         p2_parks = parks_percent_change_from_baseline,
+         p2_transit = transit_stations_percent_change_from_baseline,
+         p2_workplaces = workplaces_percent_change_from_baseline,
+         p2_residential = residential_percent_change_from_baseline)
+
+
+# Create a data frame with the pre and post dates and metrics 
+state_mobility <- dplyr::left_join(pre_mobile_week, mobile_week, by = c("state", "post_date" = "date"), copy = FALSE, suffix = c(".x", ".y"))
+
+# Keep only columns of interest
+state_mobility <- state_mobility %>%
+  select("state", "date", "post_date",
+         "p1_retail_rec", "p2_retail_rec",
+         "p1_grocery_rx", "p2_grocery_rx",
+         "p1_parks", "p2_parks",
+         "p1_transit", "p2_transit",
+         "p1_workplaces", "p2_workplaces",
+         "p1_residential", "p2_residential") %>%
+  rename(start_date = date, end_date = post_date)
+
+# Calculate percent change in mobility between those dates
+state_mobility <- state_mobility %>%
+  mutate(
+    retail_rec_change = p2_retail_rec - p1_retail_rec,
+    grocery_rx_change = p2_grocery_rx - p1_grocery_rx,
+    parks_change = p2_parks - p1_parks,
+    transit_change = p2_transit - p1_transit,
+    workplace_change = p2_workplaces - p1_workplaces,
+    residential_change = p2_residential - p1_residential,
+    covid_case_date = as.Date(end_date) + 14)
+```
+```{r join COVID case and death counts, echo=TRUE, message=FALSE}
+
+# Change the COVID count dates to datetime type
+covid_cases$date <- strptime(covid_cases$date, "%Y-%m-%d")
+
+# Left join the COVID cases for each state by the pre date
+mobility_and_covid <- dplyr::left_join(state_mobility, covid_cases, by = c("state", "start_date" = "date")) %>%
+  rename(start_cases = cases, start_deaths = deaths)
+
+# Left join in the COVID case counts for 14 days after the end date
+mobility_and_covid <- dplyr::left_join(mobility_and_covid, covid_cases, by = c("state", "covid_case_date" = "date"), copy = FALSE, suffix = c(".x", ".y")) %>%
+  rename(end_cases = cases, end_deaths = deaths)
+
+# Percent changes in cases and deaths
+mobility_and_covid <- mobility_and_covid %>%
+  mutate(perc_change_in_cases = ((end_cases - start_cases)/start_cases)*100,
+         perc_change_in_deaths = ((end_deaths - start_deaths)/start_deaths)*100)
+
+# Plot of retail/recreation mobility change and percent change in COVID cases
+# The x-value of each data point is a change in retail recreation mobility score for a paired observation in the period of interest for one state
+# The y-value represents the percent change in COVID cases between each pair's COVID case start and end-date
+# The start date for COVID counts is the same date as the interval starting date for each mobility pair
+# The end date for COVID counts is 2 weeks after the end date for each mobility pair
+ggplot(mobility_and_covid, aes(x = retail_rec_change, y = perc_change_in_cases)) +
+geom_point()
+  
+```
+```{r, add face mask data, echo = TRUE, message=TRUE}
+
+# Left join, adding in face mask mandate dates by state
+mobility_and_covid <- dplyr::left_join(mobility_and_covid, state_policies,
+                                       by = "state")
+
+# Cast the face mandate dates into POSIXct type
+mobility_and_covid$fm_first_mandate <- strptime(mobility_and_covid$fm_first_mandate, "%Y-%m-%d")
+mobility_and_covid$fm_second_mandate <- strptime(mobility_and_covid$fm_second_mandate, "%Y-%m-%d")
+mobility_and_covid$fm_end <- strptime(mobility_and_covid$fm_end, "%Y-%m-%d")
+
+
+# Add an indicator flag if a mask mandate was in-place
+#mobility_and_covid <- mobility_and_covid %>%
+ # mutate(mask_mandate_in_place = case_when(
+  #  (fm_first_mandate <=  start_date & fm_end >= end_date) ~ "Y",
+   # TRUE ~ "Check"))
+  
+```
