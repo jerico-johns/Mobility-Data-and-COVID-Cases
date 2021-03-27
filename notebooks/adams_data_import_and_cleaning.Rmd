@@ -6,22 +6,16 @@ output:
 ---
 ```{r}
 #Install packages and load libraries 
-
-#Pastecs for nice, quick summary features of our datasets. 
-#install.packages("pastecs", repos = "http://cran.us.r-project.org")
-
-library("readxl")
-#library("pastecs")
-library("tidyverse")
-library("openxlsx")
+library(readxl)
+library(tidyverse)
+library(openxlsx)
 library(sandwich)
 library(lmtest)
-
 ```
 
 
 ```{r}
-#Read in respective raw data files and save to dataframes.  
+#Read in respective raw data files and save to data frames.  
 state_policies <- read_excel("~/w203_lab2_group1/data/raw/state_policies.xlsx")
 mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
 demographic <- read.csv("~/w203_lab2_group1/data/raw/demographic_data.csv")
@@ -29,24 +23,23 @@ covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
 ```
 
 ```{r}
-# the begining of previous week for mobililty
+# the beginning of previous week for mobility
 pre_mobile_begin <- as.Date("2020-06-21")
 pre_mobile_end <- as.Date("2020-06-27")
-# the begining of current week for mobility
+# the beginning of current week for mobility
 mobile_begin <- as.Date("2020-06-28")
 mobile_end <- as.Date("2020-07-04")
-# the begining of previous week for covid
+# the beginning of previous week for covid
 pre_covid_begin <- as.Date("2020-07-12")
 covid_begin <- as.Date("2020-07-19")
 ```
 
 
 ```{r}
-
-#Start exploring and cleaning state_policies dataset. 
+#Start exploring and cleaning state_policies data set. 
 head(state_policies)
 
-#Pull out the columns we want for facemask use.
+#Pull out the columns we want for face mask use.
 state_policies <- state_policies[c("STATE", "POSTCODE", "FIPS", "FM_ALL", "FM_ALL2", "FM_END")]
 
 #Need to trim first four rows, but first we'll give better variable names
@@ -73,17 +66,23 @@ state_policies$fm_end <- openxlsx::convertToDate(state_policies$fm_end)
 #Replace all '1899-12-30' with NA
 state_policies[state_policies == '1899-12-30'] <- NA
 
-#Create new row that is our flag for a mask mandate in place as of 06/28 (our week of interest)
-state_policies['public_mask_mandate_flag'] <- ifelse(state_policies$fm_first_mandate <= '2020-06-28' & (state_policies$fm_end > '2020-07-04' | is.na(state_policies$fm_end)) | state_policies$fm_second_mandate <= '2020-06-28', 1, 0)
+#Add a flag for mask mandate in place as of 07/01 (mandate in place for the majority of our week of interest)
+state_policies['public_mask_mandate_flag'] <- ifelse(state_policies$fm_first_mandate <= '2020-07-01' & (state_policies$fm_end > '2020-07-04' | is.na(state_policies$fm_end)) | state_policies$fm_second_mandate <= '2020-07-01', 1, 0)
 
+# Replace NA values with 0
 state_policies$public_mask_mandate_flag <- ifelse(is.na(state_policies$public_mask_mandate_flag),0,state_policies$public_mask_mandate_flag)
 
+# Drop rows with NA values for state name 
 state_policies <- state_policies %>% drop_na(state)
+
+# Write the state policies data frame to a csv file
+write.csv(state_policies,
+          "~/w203_lab2_group1/data/cleaned/clean_state_policies.csv", 
+          row.names = TRUE)
 ```
 
 
 ```{r clean mobility data, echo=TRUE, message=TRUE}
-mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
 #For state level need sub_region_1 = 'state' and sub_region_2 is blank
 mobility_report <- mobility_report[which(mobility_report$sub_region_1 != '' & mobility_report$sub_region_2 == ''),]
 
@@ -93,7 +92,7 @@ mobility_report <- mobility_report %>% mutate(date=as.Date(date))
 # Keep the columns of interest
 mobility_report <- mobility_report %>% select(date, sub_region_1, contains('percent_change'))
 
-# Give the state column a meaningful name
+# Abbreviate the column names
 mobility_report <- 
   mobility_report %>%
   rename(
@@ -121,8 +120,7 @@ state_mobility <- state_mobility %>% rename(start_date = date, end_date = post_d
 ```
 
 ```{r, subset and process mobility data for desired time period, echo=TRUE, message=TRUE}
-
-# Calculate percent change in mobility between those dates
+# Calculate the difference in percent change in mobility between each day of the week pair
 state_mobility <- state_mobility %>%
   mutate(
     retail_rec_change = retail_rec_p2 - retail_rec_p1,
@@ -131,34 +129,36 @@ state_mobility <- state_mobility %>%
     transit_change = transit_p2 - transit_p1,
     workplace_change = workplaces_p2 - workplaces_p1,
     residential_change = residential_p2 - residential_p1,
-    #covid_case_date = as.Date(end_date) + 14)
   )
+
+# Write the state mobility data frame with all sectors to a csv file
+write.csv(state_mobility,
+          "~/w203_lab2_group1/data/cleaned/state_mobility.csv", 
+          row.names = TRUE)
 
 #Create filtered df for retail that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_retail <- state_mobility[c("state","end_date", "retail_rec_change")]
 
 state_mobility_retail['end_date'] <- as.character(state_mobility_retail$end_date)
 
-state_mobility_retail
-
 #Rename deltas to which day of the week they represent
 state_mobility_retail$end_date <- factor(state_mobility_retail$end_date, 
                                          levels = c('2020-06-28', '2020-06-29','2020-06-30', '2020-07-01','2020-07-02','2020-07-03','2020-07-04'),
-                                         labels = c('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'))
+                                         labels = c('Sunday_retail','Monday_retail','Tuesday_retail','Wednesday_retail','Thursday_retail','Friday_retail','Saturday_retail'))
 
 #Pivot wide so that we have one row per state, with day of week mobility changes in separate columns. 
 state_mobility_retail <- state_mobility_retail %>% pivot_wider(names_from = end_date, values_from = retail_rec_change)
 
-state_mobility_retail
-
+# Write the retail data frame to a csv file
+write.csv(state_mobility_retail,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_retail.csv", 
+          row.names = TRUE)
 
 
 #Create filtered df for Grocery that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_groc <- state_mobility[c("state","end_date", "grocery_rx_change")]
 
 state_mobility_groc['end_date'] <- as.character(state_mobility_groc$end_date)
-
-state_mobility_groc
 
 #Rename deltas to which day of the week they represent
 state_mobility_groc$end_date <- factor(state_mobility_groc$end_date, 
@@ -170,13 +170,16 @@ state_mobility_groc <- state_mobility_groc %>% pivot_wider(names_from = end_date
 
 state_mobility_groc
 
+# Write the grocery data frame to a csv file
+write.csv(state_mobility_groc,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_groc.csv", 
+          row.names = TRUE)
+
 
 #Create filtered df for parks that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_parks <- state_mobility[c("state","end_date", "parks_change")]
 
 state_mobility_parks['end_date'] <- as.character(state_mobility_parks$end_date)
-
-state_mobility_parks
 
 #Rename deltas to which day of the week they represent
 state_mobility_parks$end_date <- factor(state_mobility_parks$end_date, 
@@ -188,13 +191,16 @@ state_mobility_parks <- state_mobility_parks %>% pivot_wider(names_from = end_da
 
 state_mobility_parks
 
+# Write the parks data frame to a csv file
+write.csv(state_mobility_parks,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_parks.csv", 
+          row.names = TRUE)
+
 
 #Create filtered df for transit that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_transit <- state_mobility[c("state","end_date", "transit_change")]
 
 state_mobility_transit['end_date'] <- as.character(state_mobility_transit$end_date)
-
-state_mobility_transit
 
 #Rename deltas to which day of the week they represent
 state_mobility_transit$end_date <- factor(state_mobility_transit$end_date, 
@@ -206,12 +212,16 @@ state_mobility_transit <- state_mobility_transit %>% pivot_wider(names_from = en
 
 state_mobility_transit
 
+# Write the transit data frame to a csv file
+write.csv(state_mobility_transit,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_transit.csv", 
+          row.names = TRUE)
+
+
 #Create filtered df for transit that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_work <- state_mobility[c("state","end_date", "workplace_change")]
 
 state_mobility_work['end_date'] <- as.character(state_mobility_work$end_date)
-
-state_mobility_work
 
 #Rename deltas to which day of the week they represent
 state_mobility_work$end_date <- factor(state_mobility_work$end_date, 
@@ -223,13 +233,16 @@ state_mobility_work <- state_mobility_work %>% pivot_wider(names_from = end_date
 
 state_mobility_work
 
+# Write the work data frame to a csv file
+write.csv(state_mobility_work,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_work.csv", 
+          row.names = TRUE)
+
 
 #Create filtered df for transit that we will use to pivot wide and create a column for each day of week (each independent variable in our model). 
 state_mobility_residential <- state_mobility[c("state","end_date", "residential_change")]
 
 state_mobility_residential['end_date'] <- as.character(state_mobility_residential$end_date)
-
-state_mobility_residential
 
 #Rename deltas to which day of the week they represent
 state_mobility_residential$end_date <- factor(state_mobility_residential$end_date, 
@@ -241,10 +254,14 @@ state_mobility_residential <- state_mobility_residential %>% pivot_wider(names_f
 
 state_mobility_residential
 
+# Write the residential data frame to a csv file
+write.csv(state_mobility_residential,
+          "~/w203_lab2_group1/data/cleaned/state_mobility_residential.csv", 
+          row.names = TRUE)
 ```
 
 ```{r clean cases data}
-#Start exploring covid_cases dataset. 
+#Start exploring covid_cases data set. 
 covid_cases
 
 #Reformat character type to date type
@@ -266,67 +283,12 @@ covid_cases['p1_p2_percent_change_in_cases'] <- ((covid_cases['p2_change_in_case
 
 covid_cases
 
+# Write the cleaned covid cases dataframe to a csv file
+write.csv(covid_cases,
+          "~/w203_lab2_group1/data/cleaned/clean_covid_cases.csv", 
+          row.names = TRUE)
 ```
 
-
-
-
-```{r join COVID case and death counts, echo=TRUE, message=FALSE}
-# Change the COVID count dates to datetime type
-#covid_cases$date <- strptime(covid_cases$date, "%Y-%m-%d")
-
-# Left join the COVID cases for each state by the pre date
-#mobility_and_covid <- dplyr::left_join(state_mobility, covid_cases, by = c("state", "start_date" = "date")) %>%
-#  rename(start_cases = cases, start_deaths = deaths)
-
-# Left join in the COVID case counts for 14 days after the end date
-#mobility_and_covid <- dplyr::left_join(mobility_and_covid, covid_cases, by = c("state", "covid_case_date" = "date"), copy = FALSE, suffix = c(".x", ".y")) %>%
-  #rename(end_cases = cases, end_deaths = deaths)
-
-# Percent changes in cases and deaths
-#mobility_and_covid <- mobility_and_covid %>%
- # mutate(perc_change_in_cases = ((end_cases - start_cases)/start_cases)*100,
-        # perc_change_in_deaths = ((end_deaths - start_deaths)/start_deaths)*100)
-
-
-#mobility_and_covid
-```
-
-
-```{r plot mobility and cases, echo=TRUE, message=FALSE}
-
-# Plot of retail/recreation mobility change and percent change in COVID cases
-# The x-value of each data point is a change in retail recreation mobility score for a paired observation in the period of interest for one state
-# The y-value represents the percent change in COVID cases between each pair's COVID case start and end-date
-# The start date for COVID counts is the same date as the interval starting date for each mobility pair
-# The end date for COVID counts is 2 weeks after the end date for each mobility pair
-#ggplot(mobility_and_covid, aes(x = retail_rec_change, y = perc_change_in_cases)) +
-#geom_point()
-
-```
-
-
-
-
-```{r, add face mask data, echo = TRUE, message=TRUE}
-
-# Left join, adding in face mask mandate dates by state
-mobility_and_covid <- dplyr::left_join(mobility_and_covid, state_policies,
-                                       by = "state")
-
-# Cast the face mandate dates into POSIXct type
-#mobility_and_covid$fm_first_mandate <- strptime(mobility_and_covid$fm_first_mandate, "%Y-%m-%d")
-#mobility_and_covid$fm_second_mandate <- strptime(mobility_and_covid$fm_second_mandate, "%Y-%m-%d")
-#mobility_and_covid$fm_end <- strptime(mobility_and_covid$fm_end, "%Y-%m-%d")
-
-
-# Add an indicator flag if a mask mandate was in-place
-#mobility_and_covid <- mobility_and_covid %>%
- # mutate(mask_mandate_in_place = case_when(
-  #  (fm_first_mandate <=  start_date & fm_end >= end_date) ~ "Y",
-   # TRUE ~ "Check"))
-  
-```
 
 ```{r}
 #Start exploring demographic dataset. 
@@ -359,6 +321,11 @@ demographic
 demographic <- demographic[c("state", "percent_female", "percent_white", "percent_under_24", "percent_over_65")]
 
 demographic
+
+# Write the demographic data frame to a csv file
+write.csv(demographic,
+          "~/w203_lab2_group1/data/cleaned/cleaned_demographic.csv", 
+          row.names = TRUE)
 ```
 
 
@@ -374,18 +341,20 @@ left_join(state_mobility_residential[c("state",'Sunday_residential','Monday_resi
 left_join(covid_cases[c("state","p1_p2_percent_change_in_cases")], by = "state") %>% left_join(state_policies[c("state","public_mask_mandate_flag")], by = "state")
 
 df
+
+# Write the final data frame to a csv file
+write.csv(df,
+          "~/w203_lab2_group1/data/cleaned/df.csv", 
+          row.names = TRUE)
 ```
 
 
 ```{r begin to evaluate model}
-short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday + Monday + Tuesday + Wednesday + Thursday + Friday + Saturday, data = df)
-medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday + Monday + Tuesday + Wednesday + Thursday + Friday + Saturday + public_mask_mandate_flag, data = df)
-full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday + Monday + Tuesday + Wednesday + Thursday + Friday + Saturday + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
+short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail, data = df)
+medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag, data = df)
+full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
 
-#summary(short_model)
+summary(short_model)
 summary(medium_model)
-#summary(full_model)
-
-#coeftest(short_model, vcov=vcovHC)
-
+summary(full_model)
 ```
