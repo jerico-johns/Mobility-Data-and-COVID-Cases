@@ -1,0 +1,66 @@
+---
+title: "Regression Model and Table"
+output:
+  pdf_document: default
+  #html_document: default
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+#Import libraries 
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+```
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r}
+#Import cleaned dataframe
+df <- read.csv(file = "~/w203_lab2_group1/data/cleaned/df.csv")
+```
+
+```{r}
+#Short Model
+short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail, data = df)
+#summary(short_model)
+
+```
+
+```{r}
+#Medium Model
+medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag, data = df)
+#summary(medium_model)
+
+```
+
+```{r}
+#Full Model
+full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
+
+#summary(full_model)
+```
+
+```{r, message = FALSE}
+#Build regression table with Stargazer
+stargazer(
+  short_model, medium_model, full_model, 
+  type = 'text', omit.stat = 'all'
+)
+```
+
+
+```{r}
+#Play around with alternative model build (reverse order)
+short_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag, data = df)
+medium_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65, data = df)
+full_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65 + Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail,data = df)
+
+stargazer(
+  short_model_alt, medium_model_alt, full_model_alt, 
+  type = 'text', omit.stat = 'all'
+)
+
+```
