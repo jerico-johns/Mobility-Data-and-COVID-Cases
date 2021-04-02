@@ -28,6 +28,12 @@ df <- read.csv(file = "~/w203_lab2_group1/data/cleaned/df.csv")
 ```{r}
 #Short Model
 short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail, data = df)
+
+#Add robust standard errors
+cov_short <- vcovHC(short_model, type = "HC")
+short.robust.se <- sqrt(diag(cov_short))
+
+
 #summary(short_model)
 
 ```
@@ -37,22 +43,53 @@ short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail 
 medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag, data = df)
 #summary(medium_model)
 
+#Add robust standard errors
+cov_medium <- vcovHC(medium_model, type = "HC")
+medium.robust.se <- sqrt(diag(cov_medium))
+
 ```
 
 ```{r}
 #Full Model
 full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
 
+#Add robust standard errors
+cov_full <- vcovHC(full_model, type = "HC")
+full.robust.se <- sqrt(diag(cov_full))
+
+full.robust.se
+
 #summary(full_model)
 ```
 
 ```{r, message = FALSE}
-#Build regression table with Stargazer
+#Build regression table with Stargazer (with classical standard errors)
 stargazer(
   short_model, medium_model, full_model, 
-  type = 'text', omit.stat = 'all'
+  type = 'text', align = TRUE, title="Regression Results", 
+  dep.var.labels=c("Percent Change in New Cases"),
+  covariate.labels=c("Sunday (Retail)","Monday (Retail)", "Tuesday (Retail)", 
+                     "Wednesday (Retail)", "Thursday (Retail)", "Friday (Retail)", 
+                     "Saturday (Retail)", "Public Mask Mandate Flag", 
+                     "Percent Female", "Percent White", "Percent Under 24", 
+                     "Percent Over 65")
 )
 ```
+```{r}
+#Build regression table with Stargazer (with robust standard errors)
+stargazer(
+  short_model, medium_model, full_model, 
+  se=list(short.robust.se, medium.robust.se, full.robust.se), 
+  type = 'text', align = TRUE, title="Regression Results", 
+  dep.var.labels=c("Percent Change in New Cases"),
+  covariate.labels=c("Sunday (Retail)","Monday (Retail)", "Tuesday (Retail)", 
+                     "Wednesday (Retail)", "Thursday (Retail)", "Friday (Retail)", 
+                     "Saturday (Retail)", "Public Mask Mandate Flag", 
+                     "Percent Female", "Percent White", "Percent Under 24", 
+                     "Percent Over 65")
+)
+```
+
 ```{r test CLM assumption of linear conditional expectation}
 
 # Add columns for predicted values based upon each model
@@ -126,13 +163,13 @@ shapiro.test(residuals(full_model))
 
 ```{r}
 #Play around with alternative model build (reverse order)
-short_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag, data = df)
-medium_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65, data = df)
-full_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65 + Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail,data = df)
+# short_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag, data = df)
+# medium_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + #percent_over_65, data = df)
+# full_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65 + Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail,data = df)
 
-stargazer(
-  short_model_alt, medium_model_alt, full_model_alt, 
-  type = 'text', omit.stat = 'all'
-)
+# stargazer(
+#  short_model_alt, medium_model_alt, full_model_alt, 
+#  type = 'text', omit.stat = 'all'
+# )
 
 ```
