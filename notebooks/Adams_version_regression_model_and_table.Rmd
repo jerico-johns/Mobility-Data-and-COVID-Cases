@@ -1,0 +1,207 @@
+---
+title: "Regression Model and Table"
+output:
+  pdf_document: default
+  #html_document: default
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+#Import libraries
+install.packages("jtools", repos = "http://cran.us.r-project.org")
+library(jtools)
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+library(stats)
+```
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r}
+#Import cleaned dataframe
+df <- read.csv(file = "~/w203_lab2_group1/data/cleaned/df.csv")
+```
+
+```{r}
+#Short Model
+short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail, data = df)
+
+#Add robust standard errors
+cov_short <- vcovHC(short_model, type = "HC")
+short.robust.se <- sqrt(diag(cov_short))
+
+
+#summary(short_model)
+
+```
+
+```{r}
+#Medium Model
+medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag, data = df)
+#summary(medium_model)
+
+#Add robust standard errors
+cov_medium <- vcovHC(medium_model, type = "HC")
+medium.robust.se <- sqrt(diag(cov_medium))
+
+```
+
+```{r}
+#Full Model
+full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
+
+#Add robust standard errors
+cov_full <- vcovHC(full_model, type = "HC")
+full.robust.se <- sqrt(diag(cov_full))
+
+full.robust.se
+
+#summary(full_model)
+```
+
+```{r, message = FALSE}
+#Build regression table with Stargazer (with classical standard errors)
+stargazer(
+  short_model, medium_model, full_model, 
+  type = 'text', align = TRUE, title="Regression Results", 
+  dep.var.labels=c("Percent Change in New Cases"),
+  covariate.labels=c("Sunday (Retail)","Monday (Retail)", "Tuesday (Retail)", 
+                     "Wednesday (Retail)", "Thursday (Retail)", "Friday (Retail)", 
+                     "Saturday (Retail)", "Public Mask Mandate Flag", 
+                     "Percent Female", "Percent White", "Percent Under 24", 
+                     "Percent Over 65")
+)
+```
+```{r}
+#Build regression table with Stargazer (with robust standard errors)
+stargazer(
+  short_model, medium_model, full_model, 
+  se=list(short.robust.se, medium.robust.se, full.robust.se), 
+  type = 'text', align = TRUE, title="Regression Results", 
+  dep.var.labels=c("Percent Change in New Cases"),
+  covariate.labels=c("Sunday (Retail)","Monday (Retail)", "Tuesday (Retail)", 
+                     "Wednesday (Retail)", "Thursday (Retail)", "Friday (Retail)", 
+                     "Saturday (Retail)", "Public Mask Mandate Flag", 
+                     "Percent Female", "Percent White", "Percent Under 24", 
+                     "Percent Over 65")
+)
+```
+
+```{r test CLM assumption of linear conditional expectation}
+
+# Add columns for predicted values based upon each model
+df <- df %>% 
+  mutate(model_1_prediction = predict(short_model),
+         model_1_residuals = resid(short_model),
+         model_2_prediction = predict(medium_model),
+         model_2_residuals = resid(medium_model),
+         model_3_prediction = predict(full_model), 
+         model_3_residuals = resid(full_model))
+
+# Plot the residuals vs the predicted values for the short model
+plot_1 <- df %>%  
+  ggplot(aes(x = model_1_prediction, y = model_1_residuals)) + 
+  geom_point() + geom_smooth(method = 'lm')
+
+# Plot the residuals vs the predicted values for the medium model
+plot_2 <- df %>%  
+  ggplot(aes(x = model_2_prediction, y = model_2_residuals)) + 
+  geom_point() + geom_smooth(method = 'lm')
+
+# Plot the residuals vs the predicted values for the full model
+plot_3 <- df %>%  
+  ggplot(aes(x = model_3_prediction, y = model_3_residuals)) + 
+  geom_point() + geom_smooth(method = 'lm')
+
+#Another option of plot using stat smooth. This is the smoothing function they used in the Async to make residual plots.
+#We can delete this if we want. Just another option. I think it shows the shape of the data better.
+
+# Plot the residuals vs the predicted values for the short model
+plot_1 <- df %>%  
+  ggplot(aes(x = model_1_prediction, y = model_1_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Short Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+# Plot the residuals vs the predicted values for the medium model
+plot_2 <- df %>%  
+  ggplot(aes(x = model_2_prediction, y = model_2_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Medium Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+# Plot the residuals vs the predicted values for the full model
+plot_3 <- df %>%  
+  ggplot(aes(x = model_3_prediction, y = model_3_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Long Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+
+# I don't see any non-linear patterns in the plot of predicted value vs residuals
+# regardless of the model run
+plot_1
+plot_2
+plot_3
+```
+
+## Assessing non-linear conditional expectation in higher-dimensional space 
+
+- Using predictions and residuals is a general approach to evaluate CLM assumption 2 in higher-dimensions
+
+```{r, test CLM assumption of homoskedasticity}
+
+# Running the plots of each model appears to show unequal variance
+# The residuals vs fitted plot for the short model has some outliers with high variance above the regression line
+plot_1
+
+# These few outliers continue to exist in the plot of the improved model
+plot_2
+
+# I think that we may be getting into overfitting with the 3rd model - the line on the residuals vs fitted plot is being pulled toward the outlier values
+plot_3
+
+
+# Nevertheless, we fail to reject the null hypothesis that homoeskedasticity is present for all 3 models
+# The test assumes that error variances are due to a linear function of one or explanatory variables in the model
+# Failing to reject the null hypothesis suggests that heteroskedasticity could still be present, but if it does, those errors are not correlated with our dependent variable values
+bptest(short_model)
+bptest(medium_model)
+bptest(full_model)
+```
+```{r test for multicollinearity}
+
+# For the medium model, all VIF scores are below 5
+# So even though there is come correlation, collinearity is not problematic
+summ(medium_model, robust=TRUE, vifs=TRUE)
+
+#Wanted to see if this method had different results. They are the exact same.
+#car::vif(medium_model)
+```
+```{r test for normally distributed residuals}
+
+# Conducting the Shapiro Wilks test on the residuals of our medium model yields residuals that are not normally distributed - the p-value is smaller than an alpha of 0.05
+shapiro.test(residuals(medium_model))
+
+# But when testing the full model, we fail to reject the null hypothesis that the residuals are normally distributed
+shapiro.test(residuals(full_model))
+
+# Histogram of Residuals
+hist(df$model_2_residuals)
+
+# Q-Q Plot of Residuals
+qqnorm(df$model_2_residuals, pch = 1, frame = FALSE)
+qqline(df$model_2_residuals, col = "steelblue", lwd = 2)
+
+
+```
+
+```{r}
+#Play around with alternative model build (reverse order)
+# short_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag, data = df)
+# medium_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + #percent_over_65, data = df)
+# full_model_alt <- lm(p1_p2_percent_change_in_cases ~ public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65 + Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail,data = df)
+
+# stargazer(
+#  short_model_alt, medium_model_alt, full_model_alt, 
+#  type = 'text', omit.stat = 'all'
+# )
+
+```
