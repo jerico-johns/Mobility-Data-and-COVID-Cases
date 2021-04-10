@@ -1,0 +1,189 @@
+---
+title: "Regression Model and Table"
+output: pdf_document
+bibliography: ["references.bib"]
+---
+\inputencoding{utf8}
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+#Import libraries
+library(jtools)
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+library(stats)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r}
+#Import cleaned dataframe
+df <- read.csv(file = "~/w203_lab2_group1/data/cleaned/df.csv")
+```
+
+```{r}
+#Short Model
+short_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail, data = df)
+
+#Add robust standard errors
+cov_short <- vcovHC(short_model, type = "HC")
+short.robust.se <- sqrt(diag(cov_short))
+
+#Medium Model
+medium_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag, data = df)
+#summary(medium_model)
+
+#Add robust standard errors
+cov_medium <- vcovHC(medium_model, type = "HC")
+medium.robust.se <- sqrt(diag(cov_medium))
+
+#Full Model
+full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail + Tuesday_retail + Wednesday_retail + Thursday_retail + Friday_retail + Saturday_retail + public_mask_mandate_flag + percent_female + percent_white + percent_under_24 + percent_over_65,data = df)
+
+#Add robust standard errors
+cov_full <- vcovHC(full_model, type = "HC")
+full.robust.se <- sqrt(diag(cov_full))
+```
+
+```{r, message = FALSE}
+#Build regression table with Stargazer (with classical standard errors)
+stargazer(
+  short_model, medium_model, full_model, 
+  type = 'text', align = TRUE, title="Regression Results", 
+  dep.var.labels=c("Percent Change in New Cases"),
+  covariate.labels=c("Sunday (Retail)","Monday (Retail)", "Tuesday (Retail)", 
+                     "Wednesday (Retail)", "Thursday (Retail)", "Friday (Retail)", 
+                     "Saturday (Retail)", "Public Mask Mandate Flag", 
+                     "Percent Female", "Percent White", "Percent Under 24", 
+                     "Percent Over 65")
+)
+```
+
+
+```{r test CLM assumption of linear conditional expectation and homoskedasticity}
+
+# Add columns for predicted values based upon each model
+df <- df %>% 
+  mutate(model_1_prediction = predict(short_model),
+         model_1_residuals = resid(short_model),
+         model_2_prediction = predict(medium_model),
+         model_2_residuals = resid(medium_model),
+         model_3_prediction = predict(full_model), 
+         model_3_residuals = resid(full_model))
+
+# Plot the residuals vs the predicted values for the short model
+plot_1 <- df %>%  
+  ggplot(aes(x = model_1_prediction, y = model_1_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Short Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+# Plot the residuals vs the predicted values for the medium model
+plot_2 <- df %>%  
+  ggplot(aes(x = model_2_prediction, y = model_2_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Medium Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+# Plot the residuals vs the predicted values for the full model
+plot_3 <- df %>%  
+  ggplot(aes(x = model_3_prediction, y = model_3_residuals)) + 
+  geom_point() + stat_smooth() + ggtitle("Long Model Residual Plot") + xlab("Predictions") + ylab("Residuals")
+
+
+# I don't see any non-linear patterns in the plot of predicted value vs residuals
+# regardless of the model run
+par(mfrow=c(3,1))
+plot_1
+plot_2
+plot_3
+```
+
+```{r, test CLM assumption of homoskedasticity}
+
+# Running the plots of each model appears to show unequal variance
+# The residuals vs fitted plot for the short model has some outliers with high variance above the regression line
+plot_1
+
+# These few outliers continue to exist in the plot of the improved model
+plot_2
+
+# I think that we may be getting into overfitting with the 3rd model - the line on the residuals vs fitted plot is being pulled toward the outlier values
+plot_3
+
+
+# Nevertheless, we fail to reject the null hypothesis that homoeskedasticity is present for all 3 models
+# The test assumes that error variances are due to a linear function of one or explanatory variables in the model
+# Failing to reject the null hypothesis suggests that heteroskedasticity could still be present, but if it does, those errors are not correlated with our dependent variable values
+bptest(short_model)
+bptest(medium_model)
+bptest(full_model)
+```
+```{r test for multicollinearity}
+
+# For the medium model, all VIF scores are below 5
+# So even though there is come correlation, collinearity is not problematic
+summ(short_model, vifs=TRUE)
+summ(medium_model, vifs=TRUE)
+summ(full_model, vifs=TRUE)
+```
+
+```{r test for normally distributed residuals}
+
+# Conducting the Shapiro Wilks test on the residuals of our medium model yields residuals that are not normally distributed - the p-value is smaller than an alpha of 0.05
+shapiro.test(residuals(medium_model))
+
+# But when testing the full model, we fail to reject the null hypothesis that the residuals are normally distributed
+shapiro.test(residuals(full_model))
+
+# Q-Q Plot of Medium Model Residuals
+qqnorm(df$model_2_residuals, pch = 1, 
+       frame = FALSE, main = "Normal Q-Q Plot of Medium Model")
+qqline(df$model_2_residuals, col = "steelblue", lwd = 2)
+
+# Q-Q Plot of Full Model Residuals
+qqnorm(df$model_3_residuals, pch = 1, 
+       frame = FALSE, main = "Normal Q-Q Plot of Full Model")
+qqline(df$model_3_residuals, col = "steelblue", lwd = 2)
+```
+
+We think this is an interesting research question now because some states are starting to open up more retail and entertainment locations. For example, "as of 3/19, indoor dining can increase to 50% capacity in New York City" [@NYCBusiness]. The research result of the effects of change of mobility on new covid cases would help people and states make decisions on whether to increase their retail and entertainment activity.
+
+We choose to use 2 weeks between mobility & mask mandate and new covid cases based on the current CDC guidelines [@CDC] suggesting an individual is likely to incubate the disease 2-14 days after initial symptoms appear (which could be up to 10 days after initial infection).
+
+New Resources: 
+New York Times COVID-19 Cases Data [@NYT]A series of data files with cumulative counts of coronavirus cases in the United States, at the state and county level, over time.
+Class Resources: 
+COVID-19 US State Policy Database [@CUSP]: A database of state policy responses to the pandemic, compiled by researchers at the Boston University School of Public Health.
+COVID-19 Community Mobility Report [@Google]: A Google dataset that includes state-level measurements of individual mobility
+The American Community Survey [@USCensus]: A product from the US Census Bureau that contains state-level demographics and other indicators of general interest.
+
+percent_female(2019)
+	American Community Survey (2019) estimate of state's percentage of female residents.
+This study [@HBS] suggests that "women are much more likely than men to view COVID-19 as a severe health problem. They are also more willing to wear face masks and follow other public health recommendations to prevent the spread of the virus countries."
+
+percent_white(2019)
+	American Community Survey (2019) estimate of state's percentage of white residents.
+This article [@MayoClinic] suggests that "Research increasingly shows that racial and ethnic minorities are disproportionately affected by coronavirus disease 2019 (COVID-19) in the United States."
+Therefore we decide to include this variable to study its effect.
+
+percent_65_and_older(2019)
+American Community Survey (2019) estimate of state's percentage of residents 65 or older (66 or older at time of analysis).
+CDC suggests that "Older adults are At greater risk of requiring hospitalization or dying if diagnosed with COVID-19" [@CDC2]
+Therefore we think that states with a high percentage of older adult population could have lower mobility due to the fear of getting covid and therefore, lead to lower covid cases. We include this variable to study its effect.
+
+percent_24_and_younger(2019)
+American Community Survey (2019) estimate of state's percentage of residents 24 or younger (25 or younger at time of analysis).
+According to the news, some college students have shown reckless behavior with respect to social distancing [@InsideHigherEd]. 
+We include this variable to study if the difference in percentage of younger residents has an effect on covid cases.
+
+Public Facemask Mandate causes to decrease in new covid cases
+COVID-19 is airborne and spread by respiratory droplets which enter through the nose and mouth. Wearing a mask will help prevent the spread of these droplets into the air. It is possible for someone to spread the virus even if they do not have symptoms [@Olmsted]
+
+## Proportion of population without location tracking enabled
+The changes in mobility in our observations are obtained from smartphone devices where the user opted in to location tracking [@Newton]. This definition suggests the omission of one key variable in our model predicting Covid-19 cases by changes in mobility - the proportion of the population without a phone with location tracking enabled. This variable is not captured in the mobility, state policy, or demographic features directly.
+
+#### Percent Female and Percent White
+Studies have shown high rates of smartphone ownership across gender and race [@Pew]. The demographic composition of the group not captured by location tracking may vary, with potentially large differences in demographic composition for essential work by industry. Furthermore, we have found little research on who opts out of location sharing. For these reasons, we do not expect this omitted variable to have a relationship with percent female and percent white.
+
+#### Percent Female 
+Several studies have found gender to be correlated with mask compliance. Females were found to be more likely to comply with public mask mandates [@Haischer], which may be due to differences in gender perception of face masks [@Howard]. Therefore, we expect that the omitted variable compliance with a public mask mandate will have a positive relationship with percent female. 
+
+#### Percent White
+Some studies have found that members of minority groups are more likely to comply with mask mandates than whites, which may be related to higher rates of Covid infection and deaths among these groups [@Hearne],[@Day].
