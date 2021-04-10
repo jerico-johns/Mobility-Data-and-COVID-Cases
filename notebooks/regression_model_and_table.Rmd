@@ -51,6 +51,17 @@ stargazer(
 )
 ```
 
+```{r}
+#Run f.tests medium/short models
+anova(medium_model, short_model, test = "F")
+```
+
+
+```{r}
+#Run f.test for full/medium models
+anova(full_model, medium_model, test = "F")
+
+```
 
 ```{r}
 #Play around with alternative model build (reverse order)
