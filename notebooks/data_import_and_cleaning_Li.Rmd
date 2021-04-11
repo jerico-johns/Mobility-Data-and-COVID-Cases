@@ -26,6 +26,8 @@ state_policies <- read_excel("~/w203_lab2_group1/data/raw/state_policies.xlsx")
 mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
 demographic <- read.csv("~/w203_lab2_group1/data/raw/demographic_data.csv")
 covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+clean_state_policies <- read.csv('~/w203_lab2_group1/data/cleaned/clean_state_policies.csv')
+clean_df <- read.csv('~/w203_lab2_group1/data/cleaned/df.csv')
 ```
 
 ```{r, warning=FALSE, echo=FALSE}
@@ -145,9 +147,16 @@ return(plots)
 ```
 
 ```{r}
-get_plots("California")
+plots <- get_plots(mobility_report, covid_cases, "California")
+```
+
+
+```{r}
+covid_cases_fm <- left_join(covid_cases, state_policies, by='state')
 ```
 
 ```{r}
-get_plots("Texas")
+M <- cor(mobility_report[, c(10: 15)] %>% rename(retail=retail_and_recreation_percent_change_from_baseline, grocery=grocery_and_pharmacy_percent_change_from_baseline, parks=parks_percent_change_from_baseline, transit=transit_stations_percent_change_from_baseline, workspaces=workplaces_percent_change_from_baseline, resid= residential_percent_change_from_baseline) %>% drop_na())
+
+corrplot(M, method='circle')
 ```
