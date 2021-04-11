@@ -1,0 +1,225 @@
+---
+title: "W203 Lab 2 Final: Introduction and model building process"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r, warning=FALSE, echo=FALSE}
+#Install packages and load libraries 
+
+#Pastecs for nice, quick summary features of our datasets. 
+#install.packages("pastecs", repos = "http://cran.us.r-project.org")
+
+library("readxl")
+library("tidyverse")
+library("openxlsx")
+library(dplyr)
+library(zoo)
+library(grid)
+library(gridExtra)
+library(corrplot)
+```
+
+```{r}
+mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
+covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+```
+
+## Introduction
+
+It has been over a year since the initial outbreak of COVID-19 in the US. During this year, many states have adopted various policies to slow down the spread of the pandemic. For example, in New York city, Gov. Andrew Cuomo shut indoor on March 16, 2020. Many companies also started to operate in telecommuting mode. As a result, people’s mobility pattern is very different from the pre COVID-19 period. This presents an opportunity for studying the impact of these mobility changes on the spreading of COVID-19.
+
+We think this is an interesting research question now because some states are starting to gradually revert some policies. For example, as of 3/19, indoor dining can increase to 50% capacity in New York City. The research result of the effects of change of mobility on new covid cases would help people and states make decisions on whether to increase their retail and recreation activity.
+We propose exploring a causal relationship between the mobility, public mask mandate and demographics within a state and COVID-19 cases. Formally, our primary research question is: 
+
+How much does a percentage change in mobility impact the percentage change in new COVID-19 cases within a given state, given a 2 week lag period? 
+
+## Model Building Process
+
+### Data Sources
+
+* New York Times COVID-19 Cases Data [@NYT]: A series of data files with cumulative counts of coronavirus cases in the United States, at the state and county level, over time.
+* COVID-19 US State Policy Database [@CUSP]: A database of state policy responses to the pandemic, compiled by researchers at the Boston University School of Public Health.
+* COVID-19 Community Mobility Report [@Google]: A Google dataset that includes state-level measurements of individual mobility
+
+### Choosing the variables
+
+In this section we will define the dependent variable and independent variables, as well as our reasons to choose them. 
+
+#### Choosing the time period
+
+We decide to use mobility variables during the week June 28th, 2020 to July 4th, 2020 and the new covid cases variable with a 2 week lag - July 18th, 2020 to Jult
+
+#### Dependent variable
+
+##### percent_change_in_week_over_week_covid_cases (July 18th - 24th)
+
+Percentage change in new COVID cases, comparing the number of new cases from Sunday 07/19/20 - Saturday 07/25/20 vs. Sunday 07/12/20 - Saturday 07/18/20.
+
+The time period of the dependent variable is 2 weeks lagged from the mobility variable. The time period of the dependent variable is 2 weeks lagged from the mobility variable. We choose the 2 weeks lagging period based on the CDC suggestion that an individual is likely to incubate the disease 2-14 days after initial symptoms appear (which could be up to 10 days after initial infection).
+
+We chose to use this time period for the following reasons
+
+* This time period captures the return towards baseline mobility after the initial lock down dip (quarantine fatigue)
+* This is a week in which 31 states did not have public face mask mandates vs 20 states did, and therefore is interesting time period to study the effects of public face mask mandates on slowing down the spread of COVID-19.
+* Is a counter to the seasonal nature of the disease, i.e. weather plays less of a role in transmission during this summer time period which helps our causal question.
+* It's early enough in the pandemic that we'd expect a much lower proportion of the population to have contracted the disease already and develop antibodies, which gives us a clearer picture of our causal question.
+
+#### Independent variables
+
+##### percent_change_in_week_over_week_mobility_retail_and_recreation (Sat,Sun,M...F)
+
+Seven variables, each a percentage point change in median mobility (compared to baseline) for Retail & Recreation for the week of Sunday 06/28/20 - Saturday 07/04/20  vs Sunday 06/21/20 - Saturday 06/27/20 for each day of the week. Sunday is only compared to Sunday, etc. 
+
+It might be worthwhile to justify why do we choose one variable per weekday instead of a single variable capturing the mobility of the week:
+
+Since we have no indication of how to weight these values based on what the real baseline number is, we can’t simply average all 7 days. For example, a -10 percent change of mobility on Monday is very different from a -10 percent change of mobility on Saturday since the baseline number of people for Saturday is much higher. Therefore we decide to keep these variables separate. 
+
+##### public_mask_mandate_flag (In place as of June 28th)
+
+Flag for whether or not a public face mask mandate was in place for the state as of June 28th.
+
+##### percent_female (2019)
+
+American Community Survey (2019) estimate of state’s percentage of female residents.
+
+This study [@HBS] suggests that "women are much more likely than men to view COVID-19 as a severe health problem. They are also more willing to wear face masks and follow other public health recommendations to prevent the spread of the virus countries."
+
+##### percent_white (2019)
+
+American Community Survey (2019) estimate of state’s percentage of white residents.
+
+This article [@MayoClinic] suggests that "Research increasingly shows that racial and ethnic minorities are disproportionately affected by coronavirus disease 2019 (COVID-19) in the United States."
+
+##### percent_65_and_older (2019)
+
+American Community Survey (2019) estimate of state’s percentage of residents 65 or older (66 or older at time of analysis).
+
+CDC suggests that "Older adults are At greater risk of requiring hospitalization or dying if diagnosed with COVID-19" [@CDC2].
+
+Therefore we think that states with a high percentage of older adult population could have lower mobility due to the fear of getting covid and therefore, lead to lower covid cases. We include this variable to study its effect.
+
+##### percent_24_and_younger (2019)
+
+American Community Survey (2019) estimate of state’s percentage of residents 24 or younger (25 or younger at time of analysis) .
+
+According to the news, some college students have shown reckless behavior with respect to social distancing [@InsideHigherEd]. 
+
+We include this variable to study if the difference in percentage of younger residents has an effect on covid cases.
+
+### Choosing the mobility variable
+
+```{r, warning=FALSE, echo=FALSE}
+get_plots <- function(mobility, covid_cases, state_var) {
+
+mobility_report <- mobility
+
+covid_cases$date <- as.Date(covid_cases$date)
+# Add new cases
+covid_cases <- covid_cases %>% group_by(fips) %>% mutate(new_cases=c(NA, diff(cases)))
+  
+mob_ny <- mobility_report %>% mutate(date=as.Date(date)) %>% filter(sub_region_1==state_var)  %>% filter(sub_region_2=='')
+mob_ny_smooth <- mob_ny %>% mutate(
+  retail_and_recreation=rollmean(x=retail_and_recreation_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+  grocery_and_rx=rollmean(x=grocery_and_pharmacy_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+  transit=rollmean(x=transit_stations_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+  park=rollmean(x=parks_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+  residence=rollmean(x=residential_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+  workplaces=rollmean(x=workplaces_percent_change_from_baseline, 7, na.pad=TRUE, align="right"),
+)
+
+covid_ny <- covid_cases %>% filter(state==state_var) %>% mutate(new_cases_smooth=rollmean(x=new_cases, 7, na.pad=TRUE, align="right"))
+joined <- left_join(covid_ny, mob_ny_smooth, by='date')
+
+retail_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=retail_and_recreation)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") +
+  labs(colours = "Variables")
+
+grocery_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=grocery_and_rx)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+
+transit_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=transit)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+
+park_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=park)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+
+resid_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=residence)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+
+work_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=workplaces)) + 
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+
+plots <- grid.arrange(
+  retail_plot,
+  grocery_plot,
+  transit_plot,
+  park_plot,
+  resid_plot,
+  work_plot,
+  nrow = 3,
+  top = "Figure 1: Moblity and New Covid Cases in California\n",
+  bottom = "Mobility(Black): percent\nNew Covid Cases(Green): 1000 cases"
+)
+
+return(plots)
+}
+```
+
+In this section, we will show the process of choosing the mobility variable. The two charts show (1) the correlation plot between different variables and (2) the time series plot show the relationship between different mobility variables by time.
+
+```{r, warning=FALSE, echo=FALSE}
+plots <- get_plots(mobility_report, covid_cases, 'California')
+```
+
+```{r, warning=FALSE, echo=FALSE}
+M <- cor(mobility_report[, c(10: 15)] %>% rename(retail_and_recreation=retail_and_recreation_percent_change_from_baseline, grocery_and_rx=grocery_and_pharmacy_percent_change_from_baseline, parks=parks_percent_change_from_baseline, transit=transit_stations_percent_change_from_baseline, workspaces=workplaces_percent_change_from_baseline, residential= residential_percent_change_from_baseline) %>% drop_na())
+
+corrplot(M, method='circle', title="Figure 2 Mobility variable correlations", mar=c(0,0,1,0))
+```
+
+Figure 1, 2 show that retail, transit and grocery have positive relationships of > 0.70 (figure 2) and they tend to move in the same direction (figure 1). Retail and residential has a negative relationship of -0.75  and they tend to move approximately in the opposite direction.
+
+Since retail mobility is positively correlated with transit and grocery and negatively correlated with residence mobility, we decide to only include one of them as our independent mobility variable. We decide to use retail mobility because we think it’s practical meaning is the most interesting among all the mobility variables, given the political focus on restaurants and storefronts. 
+
+Another observation is that there is no clear correlation between any of the mobility variables and new covid cases. Still, we decide to include mobility as an independent variable to study its combined effects with other independent variables (public mask mandate and demographic variables)
+
+### Modeling Goal
+
+Our modeling goal is explanatory. Primarily, we are interested in the causal relationship between mobility change in retail and recreation of the week of 06/28/2020 and the change of new covid cases 2 weeks later. Secondarily, we are interested in the casual described above, with the control of public mask mandate and demographic variables as control variables.
+
+We are only studying the casual relationship within the chosen time period and not planning to extend any conclusion beyond the original time period.
+
+### Casual Theory
+
+#### Increase in retail and recreation mobility causes increase in new covid cases
+
+From CDC:
+“The virus that causes COVID-19 most commonly spreads from person to person by respiratory droplets during close physical contact (within 6 feet). The virus can sometimes spread from person to person by small droplets or virus particles that linger in the air for minutes to hours.”
+
+Based on this, our casual theory is that an increase in retail and recreation mobility would result in an increase in the number of people that each person is in contact with, and therefore, increase the chances of each individual infected by covid, and finally, result in an increase in new covid cases.
+
+#### Public Facemask Mandate causes decrease in new covid cases
+
+COVID-19 is airborne and spread by respiratory droplets which enter through the nose and mouth. Wearing a mask will help prevent the spread of these droplets into the air. It is possible for someone to spread the virus even if they do not have symptoms [@Olmsted].
+
+Based on this, our casual theory is that public facemask mandate causes a decrease in new covid cases, so long as mobility is constant. In other words, public mask mandates moderate the impact mobility has on new COVID-19 cases. 
+
+### Model Specifications
+
+#### Linear Model
+
+precent_change_in_week_over_week_covid_cases ~ precent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday)
+
+#### Model Two
+
+change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday) + public_mask_mandate_flag
+
+#### Model Three
+
+percent_change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday) + public_mask_mandate_flag + percent_white + percent_female + percent_under_24 + percent_over_65
+
+
+
+
