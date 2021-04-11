@@ -230,6 +230,9 @@ change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility
 percent_change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday) + public_mask_mandate_flag + percent_white + percent_female + percent_under_24 + percent_over_65
 
 ## Regression Table
+
+We chose to use classical standard errors in our regression model and coefficient tests because in our case, they were larger than robust standard errors (more conservative). As will be discussed in our assessment of the classical linear model assumptions, we have not found evidence of heteroscedastic variance of errors. We chose to use a general linear F-test for nested models to determine if there is a statistically significant improvement in our F-statistic between reduced and full models. This gives us a statistically testable comparison of our models based on the error sum of squares (SSE) for each. We prefer the comparison of the SSE statistic to R-squared because it is in the same unit as the dependent variable, whereas R-squared is a percentage term, and thus SSE is more easily interpretable in both absolute and relative terms.  For assessing the significance of the coefficients of our predictors and for conducting our F-test, we chose to use an alpha level of 0.05 due to the popularity of this threshold value and since we do not have a preference, given our limited background in the study of COVID-19 case analysis.
+
 ```{r, warning=FALSE, echo=FALSE}
 #Import cleaned dataframe
 df <- read.csv(file = "~/w203_lab2_group1/data/cleaned/df.csv")
@@ -270,8 +273,25 @@ stargazer(
                      "Percent Over 65")
 )
 ```
+```{r}
+#Run f.tests medium/short models
+anova(medium_model, short_model, test = "F")
+```
 
+```{r}
+#Run f.test for full/medium models
+anova(full_model, medium_model, test = "F")
+```
 
+The results of our regression analysis in the results table indicate that, generally, changes in mobility (as proxied by recreation and retail) for the weeks of June 28, 2020 to July 4th, 2020 do not explain changes in new COVID-19 cases two weeks later (unless the effect of mobility has been masked by an omitted variable). Model 1 in the regression table above demonstrates that there is not a statistically significant weekday mobility change that explains changes in statewide COVID-19 cases. As a whole, we fail to reject the null hypothesis that Model 1 has a significantly higher F-statistic than an intercept only model (p > 0.05). We also observe that adding a control for a public mask mandate flag in Model 2 does not significantly improve our model compared to Model 1 (we fail to reject the null hypothesis that Model 2 has a statistically different F-statistic than Model 1  since conducting an F-test to compare models 1 and 2 results in a p-value greater than our alpha of 0.05). The public mask mandate variable is not significant at an alpha level of 0.05. 
+
+Interestingly, we see significant improvements in our explanatory model as a whole as measured by a reduction in the sum of squared estimates of errors (also known as RSS) and certain explanatory variables when adding controls for state-level demographic features in Model 3. We reject our null hypothesis that Model 2 and Model 3 have the same F-statistic (since the resulting p-value from the F-test of models 2 and 3 is less than our alpha of 0.05), and conclude that Model 3 is a statistically significant improvement upon Model 2 and an intercept only model (i.e. a regression with no independent variables). 
+
+When controlling for a state’s gender balance (percent female), racial composition (percent white), and age (percent under 24 and percent over 65), we observe that the change in mobility for Thursday (July 2nd compared to June 25th) is statistically significant at an alpha level of 0.05. However, since only one weekday’s mobility change is statistically significant, we do not deem this finding a practically significant finding regarding mobility more generally (for this week long period). Six of seven mobility variables are still not statistically significant. Thus, we conclude that changes in mobility do not explain changes in new COVID-19 cases for this time-period and this model specifically. Mobility may still explain changes in COVID-19 cases in different time periods or if we were able to include all omitted variables discussed later.  
+
+In our Model 3, we observe that the public mask mandate flag is statistically significant (p = 0.04) at an alpha level of 0.05, when controlling for mobility and the aforementioned demographic variables. In our observation period, state’s with a public mask mandate flag in place as of June 28th, 2020 (i.e. the majority of the week that includes the July 4th holiday) saw 14% fewer new COVID-19 cases week-over-week, two weeks after the mobility time period than states with no public mask mandate flag in place, holding mobility and demographics constant. This is both statistically and practically significant. This indicates that the oft-debated mask policies instituted during this time period may be effective at reducing new COVID-19 cases (holding other variables constant), if this observation is not an artifact of omitted variable bias. 
+
+We also observe that percent female (p = 0.03) and percent white (p = 0.002) are statistically significant at an alpha level of 0.05 in our Model 3. A 1 percentage point (ppt) increase in a state’s proportion of female residents was associated with 9% fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This is both statistically and practically significant. Although a state can not simply adjust demographic composition, it is practically significant in helping understand how COVID-19 may impact different genders and/or how different gender groups may adhere to COVID-19 health guidelines. A 1 ppt increase in a state’s proportion of residents who identify as white was associated with 1% fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This coefficient is statistically significant and practically significant. Even though this is our smallest coefficient estimate, the implications of COVID-19 trending differently for different races points to a need for further research in this critical area. 
 
 
 ## Limitations of the Model
