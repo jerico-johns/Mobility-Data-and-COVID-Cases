@@ -1,11 +1,11 @@
 ---
-title: "W203 Lab 2 Final: Introduction and model building process"
+title: "W203 Lab 2 Report: How does moblity affects COVID-19 cases"
 output:
   pdf_document: default
   html_notebook: default
 ---
 
-```{r, warning=FALSE, echo=FALSE}
+```{r, warning=FALSE, echo=FALSE, message=FALSE, include=FALSE}
 #Install packages and load libraries 
 
 #Pastecs for nice, quick summary features of our datasets. 
@@ -33,6 +33,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```{r}
 mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
 covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
+df <- read.csv("~/w203_lab2_group1/data/cleaned/df.csv")
 ```
 
 ## Introduction
@@ -44,6 +45,8 @@ We propose exploring a causal relationship between the mobility, public mask man
 
 How much does a percentage change in mobility impact the percentage change in new COVID-19 cases within a given state, given a 2 week lag period? 
 
+We choose to use 2 weeks between mobility & mask mandate and new COVID-19 cases based on the current CDC guidelines [@CDC] suggesting an individual is likely to incubate the disease 2-14 days after initial symptoms appear (which could be up to 10 days after initial infection).Thus 2 weeks after (i.e. days 14 to 21) mobility/mask mandate best covers this period of 12 to 24 days. 
+
 ## Model Building Process
 
 ### Data Sources
@@ -51,6 +54,7 @@ How much does a percentage change in mobility impact the percentage change in ne
 * New York Times COVID-19 Cases Data [@NYT]: A series of data files with cumulative counts of coronavirus cases in the United States, at the state and county level, over time.
 * COVID-19 US State Policy Database [@CUSP]: A database of state policy responses to the pandemic, compiled by researchers at the Boston University School of Public Health.
 * COVID-19 Community Mobility Report [@Google]: A Google dataset that includes state-level measurements of individual mobility
+* The American Community Survey [@USCensus]: A product from the US Census Bureau that contains state-level demographics and other indicators of general interest.
 
 ### Choosing the variables
 
@@ -70,24 +74,25 @@ The time period of the dependent variable is 2 weeks lagged from the mobility va
 
 We chose to use this time period for the following reasons
 
-* This time period captures the return towards baseline mobility after the initial lock down dip (quarantine fatigue)
+* This time period captures the return towards baseline mobility after the initial lock down dip (quarantine fatigue) which is an interesting time period to study (Figure 2) 
 * This is a week in which 31 states did not have public face mask mandates vs 20 states did, and therefore is interesting time period to study the effects of public face mask mandates on slowing down the spread of COVID-19.
 * Is a counter to the seasonal nature of the disease, i.e. weather plays less of a role in transmission during this summer time period which helps our causal question.
 * It's early enough in the pandemic that we'd expect a much lower proportion of the population to have contracted the disease already and develop antibodies, which gives us a clearer picture of our causal question.
+
+Our method of choosing percent_change and the lag between change in covid cases and change in mobility is akin to the “differenced panels” approach on async video 11.14. Similar to “differenced panels approach”. By taking the difference of percent in new covid cases, we can reduce some impacts of the confounding variables.
 
 #### Independent variables
 
 ##### percent_change_in_week_over_week_mobility_retail_and_recreation (Sat,Sun,M...F)
 
-Seven variables, each a percentage point change in median mobility (compared to baseline) for Retail & Recreation for the week of Sunday 06/28/20 - Saturday 07/04/20  vs Sunday 06/21/20 - Saturday 06/27/20 for each day of the week. Sunday is only compared to Sunday, etc. 
-
-It might be worthwhile to justify why do we choose one variable per weekday instead of a single variable capturing the mobility of the week:
+Seven variables, each a percentage point change in median mobility (compared to baseline) for Retail & Recreation for the week of Sunday 06/28/20 - Saturday 07/04/20  vs Sunday 06/21/20 - Saturday 06/27/20 for each day of the week. Sunday is only compared to Sunday, etc.
 
 Since we have no indication of how to weight these values based on what the real baseline number is, we can’t simply average all 7 days. For example, a -10 percent change of mobility on Monday is very different from a -10 percent change of mobility on Saturday since the baseline number of people for Saturday is much higher. Therefore we decide to keep these variables separate. 
 
 ##### public_mask_mandate_flag (In place as of June 28th)
 
-Flag for whether or not a public face mask mandate was in place for the state as of June 28th.
+Flag for whether or not a public face mask mandate was in place for the state as of June 28th (i.e. the majority of the week of July 4th, our primary week of interest for change in mobility)
+
 
 ##### percent_female (2019)
 
@@ -95,11 +100,15 @@ American Community Survey (2019) estimate of state’s percentage of female resi
 
 This study [@HBS] suggests that "women are much more likely than men to view COVID-19 as a severe health problem. They are also more willing to wear face masks and follow other public health recommendations to prevent the spread of the virus countries."
 
+Therefore we decide to include this variable as a control variable.
+
 ##### percent_white (2019)
 
 American Community Survey (2019) estimate of state’s percentage of white residents.
 
 This article [@MayoClinic] suggests that "Research increasingly shows that racial and ethnic minorities are disproportionately affected by coronavirus disease 2019 (COVID-19) in the United States."
+
+Therefore we decide to include this variable as a control variable.
 
 ##### percent_65_and_older (2019)
 
@@ -107,7 +116,7 @@ American Community Survey (2019) estimate of state’s percentage of residents 6
 
 CDC suggests that "Older adults are At greater risk of requiring hospitalization or dying if diagnosed with COVID-19" [@CDC2].
 
-Therefore we think that states with a high percentage of older adult population could have lower mobility due to the fear of getting covid and therefore, lead to lower covid cases. We include this variable to study its effect.
+Therefore we think that states with a high percentage of older adult population could have lower mobility due to the fear of getting COVID-19 and therefore, lead to lower COVID-19 cases.We decide to include this variable as a control variable.
 
 ##### percent_24_and_younger (2019)
 
@@ -115,7 +124,7 @@ American Community Survey (2019) estimate of state’s percentage of residents 2
 
 According to the news, some college students have shown reckless behavior with respect to social distancing [@InsideHigherEd]. 
 
-We include this variable to study if the difference in percentage of younger residents has an effect on covid cases.
+Therefore we decide to include this variable as a control variable.
 
 ### Choosing the mobility variable
 
@@ -142,23 +151,22 @@ covid_ny <- covid_cases %>% filter(state==state_var) %>% mutate(new_cases_smooth
 joined <- left_join(covid_ny, mob_ny_smooth, by='date')
 
 retail_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=retail_and_recreation)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") +
-  labs(colours = "Variables")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 grocery_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=grocery_and_rx)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 transit_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=transit)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 park_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=park)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 resid_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=residence)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 work_plot <- joined %>% ggplot(aes(x=date)) + geom_line(aes(y=workplaces)) + 
-  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m")
+  geom_line(aes(y=new_cases_smooth / 1000), color='green') + scale_x_date(date_labels = "%m") + xlab("month")
 
 plots <- grid.arrange(
   retail_plot,
@@ -168,7 +176,7 @@ plots <- grid.arrange(
   resid_plot,
   work_plot,
   nrow = 3,
-  top = "Figure 1: Moblity and New Covid Cases in California\n",
+  top = "Figure 2: Moblity and New Covid Cases in California\n",
   bottom = "Mobility(Black): percent\nNew Covid Cases(Green): 1000 cases"
 )
 
@@ -179,24 +187,52 @@ return(plots)
 In this section, we will show the process of choosing the mobility variable. The two charts show (1) the correlation plot between different variables and (2) the time series plot show the relationship between different mobility variables by time.
 
 ```{r, warning=FALSE, echo=FALSE}
-plots <- get_plots(mobility_report, covid_cases, 'California')
+M <- cor(mobility_report[, c(10: 15)] %>% rename(retail_and_recreation=retail_and_recreation_percent_change_from_baseline, grocery_and_rx=grocery_and_pharmacy_percent_change_from_baseline, parks=parks_percent_change_from_baseline, transit=transit_stations_percent_change_from_baseline, workspaces=workplaces_percent_change_from_baseline, residential= residential_percent_change_from_baseline) %>% drop_na())
+
+corrplot(M, method='circle', title="Figure 1 Mobility variable correlations", mar=c(0,0,1,0))
 ```
 
 ```{r, warning=FALSE, echo=FALSE}
-M <- cor(mobility_report[, c(10: 15)] %>% rename(retail_and_recreation=retail_and_recreation_percent_change_from_baseline, grocery_and_rx=grocery_and_pharmacy_percent_change_from_baseline, parks=parks_percent_change_from_baseline, transit=transit_stations_percent_change_from_baseline, workspaces=workplaces_percent_change_from_baseline, residential= residential_percent_change_from_baseline) %>% drop_na())
-
-corrplot(M, method='circle', title="Figure 2 Mobility variable correlations", mar=c(0,0,1,0))
+plots <- get_plots(mobility_report, covid_cases, 'California')
 ```
 
-Figure 1, 2 show that retail, transit and grocery have positive relationships of > 0.70 (figure 2) and they tend to move in the same direction (figure 1). Retail and residential has a negative relationship of -0.75  and they tend to move approximately in the opposite direction.
+Figure 1, 2 show that retail, transit and grocery have positive correlation of > 0.70 (figure 2) and they tend to move in the same direction (figure 1). Retail and residential has a negative correlation of -0.75  and they tend to move approximately in the opposite direction.
 
-Since retail mobility is positively correlated with transit and grocery and negatively correlated with residence mobility, we decide to only include one of them as our independent mobility variable. We decide to use retail mobility because we think it’s practical meaning is the most interesting among all the mobility variables, given the political focus on restaurants and storefronts. 
+Since retail mobility is positively correlated with transit and grocery and negatively correlated with residence mobility, we decide to only include one of them as our independent mobility variable. We decide to use retail mobility because we think its practical meaning is the most interesting among all the mobility variables, given the political focus on restaurants and storefronts. We decide not to use workplaces and park mobility variable because (1) park is outdoor and easier to maintain 6-feet social distances, and therefore, we don’t expect change in park mobility will cause change in new covid cases and (2) for workplaces, generally speaking people have less control of whether to go to workplaces or not, and therefore, this variable does not have sufficient practical impact.
 
-Another observation is that there is no clear correlation between any of the mobility variables and new covid cases. Still, we decide to include mobility as an independent variable to study its combined effects with other independent variables (public mask mandate and demographic variables)
+Another observation is that there is no clear correlation between any of the mobility variables and new COVID-19 cases. Still, we decide to include mobility as an independent variable to study its combined effects with other independent variables (public mask mandate and demographic variables)
+
+### Examine the control variables
+
+In this section, we will examine the relationship between control variables (public_mask_mandate_flag, percent_female, percent_white, percent_65_and_older, percent_24_and_younger) and the dependent variable (percent_change_in_week_over_week_covid_cases) for the study time period (July 18th - 24th).
+
+#### Public mask mandate
+
+Looking the boxplot for percent change in COVID-19 cases group by public mask mandate variable for the 51 states (Figure 3), we see that there is a slight higher mean states without public mask mandate, but the variable is also pretty high to draw any conclusion from this plot. We decide to include this control variable and further examine its coefficient and p-value.
+
+``` {r, warning=FALSE, echo=FALSE}
+df %>% ggplot(aes(x=public_mask_mandate_flag, group=public_mask_mandate_flag, y=p1_p2_percent_change_in_cases)) + geom_boxplot() + ylab("% change in covid cases") + xlab("State-wide Public mask mandate (0 means no mandate)") + ggtitle("Figure 3: \n change in covid cases with/without public mask mandate")
+```
+
+#### Demongraphics variables
+
+Here is a combined scatter plot for the four demographics variables we are interested in (percent_female, percent_white, percent_65_and_older, percent_24_and_younger). The scatter plots don't show a clear pattern of the linear relationship just by these control variables themselves. Nonetheless, we decide to include these variables in the model specification to study further.
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+percent_female <- df %>% ggplot(aes(x=percent_female, y=p1_p2_percent_change_in_cases)) + geom_point() + stat_smooth(se=TRUE) + xlab("% female population") + ylab("% change in covid cases")
+percent_white <- df %>% ggplot(aes(x=percent_white, y=p1_p2_percent_change_in_cases)) + geom_point() + stat_smooth(se=TRUE) +xlab("% white population") + ylab("% change in covid cases")
+percent_over_65 <- df %>% ggplot(aes(x=percent_over_65, y=p1_p2_percent_change_in_cases)) + geom_point() + stat_smooth(se=TRUE) +xlab("% population over 65 years old ") + ylab("% change in covid cases")
+percent_under_24 <- df %>% ggplot(aes(x=percent_under_24, y=p1_p2_percent_change_in_cases)) + geom_point() + stat_smooth(se=TRUE) +xlab("% population under 24 years old ") + ylab("% change in covid cases")
+
+grid.arrange(
+  percent_female, percent_white, percent_over_65, percent_under_24, nrow = 2,
+  bottom = "Figure 4: \nRelationship between demongraphics control variables and % change in covid cases\n"
+)
+```
 
 ### Modeling Goal
 
-Our modeling goal is explanatory. Primarily, we are interested in the causal relationship between mobility change in retail and recreation of the week of 06/28/2020 and the change of new covid cases 2 weeks later. Secondarily, we are interested in the casual described above, with the control of public mask mandate and demographic variables as control variables.
+Our modeling goal is explanatory. Primarily, we are interested in the causal relationship between mobility change in retail and recreation of the week of 06/28/2020 and the change of new COVID-19 cases 2 weeks later. Secondarily, we are interested in the casual described above, with the control of public mask mandate and demographic variables as control variables.
 
 We are only studying the casual relationship within the chosen time period and not planning to extend any conclusion beyond the original time period.
 
