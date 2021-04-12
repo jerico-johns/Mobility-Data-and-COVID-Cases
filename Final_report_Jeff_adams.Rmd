@@ -35,7 +35,7 @@ df <- read.csv("~/w203_lab2_group1/data/cleaned/df.csv")
 
 ## Introduction
 
-It has been over a year since the initial outbreak of COVID-19 in the US. During this year, many states have adopted various policies to slow down the spread of the pandemic. For example, in New York city, Gov. Andrew Cuomo shut indoor on March 16, 2020. Many companies also started to operate in telecommuting mode. As a result, people's mobility patterns are very different from the pre-COVID period. This presents an opportunity for studying the impact of these mobility changes on the spreading of COVID-19.
+It has been over a year since the initial outbreak of COVID-19 in the US. During this year, many states have adopted various policies to slow down the spread of the pandemic. For example, in New York City, Governor Andrew Cuomo shut indoor dining on March 16, 2020. Many companies also started to operate in telecommuting mode. As a result, people's mobility patterns are very different from the pre-COVID period. This presents an opportunity for studying the impact of these mobility changes on the spread of COVID-19.
 
 We think this is an interesting research question now because some states are starting to gradually revert some policies. For example, as of 3/19/21, indoor dining can increase to $50\%$ capacity in New York City [@NYCBusiness]. The research result of the effects of change of mobility on new COVID-19 cases would help people and states make decisions on whether to increase their retail and recreation activity.
 
@@ -67,14 +67,14 @@ In this section we will define the dependent variable and independent variables,
 
 Percentage change in new COVID cases, comparing the number of new cases from Sunday 07/19/20 - Saturday 07/25/20 vs. Sunday 07/12/20 - Saturday 07/18/20.
 
-The time period of the dependent variable is $2$ weeks lagged from the mobility variable. The time period of the dependent variable is $2$ weeks lagged from the mobility variable. We chose the $2$ weeks lagging period based on the CDC suggestion that an individual is likely to incubate the disease $2-14$ days after initial symptoms appear (which could be up to $10$ days after initial infection). We chose to use percentage change in COVID-19 cases rather than case counts in order to study the impact of mobility when states have very different population sizes, since total case count is related to a state's population size.
+The time period of the dependent variable is $2$ weeks lagged from the mobility variable. We chose the $2$ weeks lagging period based on the CDC suggestion that an individual is likely to incubate the disease $2-14$ days after initial symptoms appear (which could be up to $10$ days after initial infection). We chose to use percentage change in COVID-19 cases rather than case counts in order to study the impact of mobility when states have very different population sizes, since total case count is related to a state's population size.
 
 We chose to use this specific time period for the following reasons:
 
-* This time period captures the return towards baseline mobility after the initial lock down dip (quarantine fatigue) which is an interesting time period to study (Figure 2) 
+* This time period captures the return towards baseline mobility after the initial lock down dip (quarantine fatigue) which is an interesting time period to study (Figure 2). 
 * This is a week in which $31$ states did not have public face mask mandates vs $20$ states which did, and therefore is interesting time period to study the effects of public face mask mandates on slowing down the spread of COVID-19 (policy variation and closes to a balanced count between groups).
 * Is a counter to the seasonal nature of the disease, i.e. weather plays less of a role in transmission during this summer time period which helps our causal question [@CCDD].
-* It is early enough in the pandemic that we'd expect a much lower proportion of the population to have contracted the disease already and develop antibodies, which gives us a clearer picture of our causal question.
+* It's also early enough in the pandemic that we'd expect a much lower proportion of the population to have contracted the disease already and develop antibodies, which gives us a clearer picture of our causal question since antibodies / disease resistance could be a potential confounding variable.
 
 Our method of choosing percent_change and the lag between change in COVID-19 cases and change in mobility is similar to the 'differenced panels' approach on async video 11.14. By taking the percent change in new COVID-19 cases, we can reduce some impacts of the confounding variables.
 
@@ -84,12 +84,11 @@ Our method of choosing percent_change and the lag between change in COVID-19 cas
 
 Seven variables, each a percentage point change in median mobility (compared to baseline) for Retail & Recreation for the week of Sunday 06/28/20 - Saturday 07/04/20  vs Sunday 06/21/20 - Saturday 06/27/20 for each day of the week. Sunday is only compared to Sunday, etc.
 
-Since we have no indication of how to weight these values based on what the real baseline number is, we can't simply average all $7$ days. For example, a $-10\%$ change of mobility on Monday is very different from a $-10\%$ change of mobility on Saturday since the baseline number of people for Saturday is much higher. Therefore we decide to keep these variables separate. 
+Since we have no indication of how to weight these values based on what the real baseline number is (not provided in Google's dataset), we can't simply average all $7$ days. For example, a $-10\%$ change of mobility on Monday is very different from a $-10\%$ change of mobility on Saturday since the baseline number of people for Saturday is much higher. Therefore we decide to keep these variables separate. 
 
 ##### public_mask_mandate_flag (In place as of July 1st)
 
 Flag for whether or not a public face mask mandate was in place for the state as of July $1st$ (to capture the majority of the week of July $4th$, our primary week of interest for change in mobility)
-
 
 ##### percent_female (2019)
 
@@ -173,7 +172,7 @@ plots <- grid.arrange(
   resid_plot,
   work_plot,
   nrow = 3,
-  top = "Figure 2: Moblity and New Covid Cases in California\n",
+  top = "Figure 2: Moblity and New Covid Cases in California (April 2020 to April 2021)\n",
   bottom = "Mobility(Black): percent\nNew Covid Cases(Green): 1000 cases"
 )
 
@@ -289,6 +288,8 @@ full_model <- lm(p1_p2_percent_change_in_cases ~ Sunday_retail + Monday_retail +
 cov_full <- vcovHC(full_model, type = "HC")
 full.robust.se <- sqrt(diag(cov_full))
 ```
+
+
 ```{r, warning=FALSE, echo=FALSE}
 #Build regression table with Stargazer (with classical standard errors)
 stargazer(
@@ -302,12 +303,18 @@ stargazer(
                      "Percent Over 65")
 )
 ```
-```{r}
+
+
+
+#### Comparison of Model 2 and Model 1: 
+```{r, warning=FALSE, echo=FALSE}
 #Run f.tests medium/short models
 anova(medium_model, short_model, test = "F")
 ```
 
-```{r}
+
+#### Comparison of Model 3 and Model 2:  
+```{r, warning=FALSE, echo=FALSE}
 #Run f.test for full/medium models
 anova(full_model, medium_model, test = "F")
 ```
@@ -316,11 +323,11 @@ The results of our regression analysis in the results table using the stargazer 
 
 Interestingly, we see significant improvements in our explanatory model as a whole as measured by a reduction in the sum of squared estimates of errors (also known as RSS) and certain explanatory variables when adding controls for state-level demographic features in Model $3$. We reject our null hypothesis that Model $2$ and Model $3$ have the same F-statistic (since the resulting p-value from the F-test of models $2$ and $3$ is less than our $\alpha$ of $0.05$), and conclude that Model $3$ is a statistically significant improvement upon Model 2 and an intercept only model (i.e. a regression with no independent variables). 
 
-When controlling for a state's gender balance (percent female), racial composition (percent white), and age (percent under $24$ and percent over $65$), we observe that the change in mobility for Thursday (July $2nd$ compared to June $25th$) is statistically significant at an $\alpha$ level of $0.05$. However, since only one weekday's mobility change is statistically significant, we do not deem this finding a practically significant finding regarding mobility more generally (for this week long period). Six of seven mobility variables are still not statistically significant. Thus, we conclude that changes in mobility do not explain changes in new COVID-19 cases for this time-period and this model specifically. Mobility may still explain changes in COVID-19 cases in different time periods or after accounting for the impact od all omitted variables, such as those discussed shortly.  
+When controlling for a state's gender balance (percent female), racial composition (percent white), and age (percent under $24$ and percent over $65$), we observe that the change in mobility for Thursday (July $2nd$ compared to June $25th$) is statistically significant at an $\alpha$ level of $0.05$. However, since only one weekday's mobility change is statistically significant, we do not deem this finding a practically significant finding regarding mobility more generally (for this week long period). Six of seven mobility variables are still not statistically significant. Thus, we conclude that changes in mobility do not explain changes in new COVID-19 cases for this time-period and this model specifically. Mobility may still explain changes in COVID-19 cases in different time periods or after accounting for the impact of all omitted variables (see Omitted Variables section). 
 
 In our Model $3$, we observe that the public mask mandate flag is statistically significant ($p = 0.04$) at an $\alpha$ level of $0.05$, when controlling for mobility and the aforementioned demographic variables. In our observation period, state's with a public mask mandate flag in place as of July $1st$, $2020$ (i.e. the majority of the week that includes the July $4th$ holiday) saw $14\%$ fewer new COVID-19 cases week-over-week, two weeks after the mobility time period than states with no public mask mandate flag in place, holding mobility and demographics constant. This is both statistically and practically significant. This indicates that the oft-debated mask policies instituted during this time period may be effective at reducing new COVID-19 cases (holding other variables constant), if this observation is not an artifact of omitted variable bias. 
 
-We also observe that percent female ($p = 0.03$) and percent white ($p = 0.002$) are statistically significant at an $\alpha$ level of $0.05$ in our Model $3$. A $1$ percentage point (ppt) increase in a state's proportion of female residents was associated with $9\%$ fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This is both statistically and practically significant. Although a state can not simply adjust demographic composition, it is practically significant in helping understand how COVID-19 may impact different genders and/or how different gender groups may adhere to COVID-19 health guidelines. A 1 ppt increase in a state's proportion of residents who identify as white was associated with $1\%$ fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This coefficient is statistically significant and practically significant, if this observation is not an artifact of omitted variable bias. Even though this is our smallest coefficient estimate, the implications of COVID-19 trending differently for different races points to a need for further research in this critical area. 
+We also observe that percent female ($p = 0.03$) and percent white ($p = 0.002$) are statistically significant at an $\alpha$ level of $0.05$ in our Model $3$. A $1$ percentage point (ppt) increase in a state's proportion of female residents was associated with $9\%$ fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This is both statistically and practically significant. Although a state can not simply adjust demographic composition, it is practically significant in helping understand how COVID-19 may impact different genders and/or how different gender groups may adhere to COVID-19 health guidelines. A 1 ppt increase in a state's proportion of residents who identify as white was associated with $1\%$ fewer new COVID-19 cases week-over-week, when holding mobility, public mask mandate flag, and other demographic variables constant. This coefficient is statistically significant and practically significant, if this observation is not an artifact of omitted variable bias. Even though this is our smallest coefficient estimate, the implications of COVID-19 trending differently for different racial groups points to a need for further research in this critical area. 
 
 
 ## Limitations of the Model
