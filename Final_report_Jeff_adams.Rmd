@@ -395,8 +395,9 @@ Since our 2nd and 3rd models contain multiple predictors, we proceeded to test t
 plot_1
 ```
 Since the plots of residuals versus predicted values do not demonstrate a clear non-linear relationship, we have not found evidence that the addition of additional predictors in the second and third models result in a clear violation of the CLM assumption of linear conditional expectation.
+
 #### Homoscedasticity
-The CLM assumption of homoscedasticity can also be assessed visually, through the plots of the residuals versus the predicted values used to assess the assumption of linear conditional expectation. In the plots of residuals versus predicted values for the short and medium models, the distance of the residuals from the fitted line increases toward the center and is lower on the ends where there are fewer data points. Since we failed to reject the null hypothesis of a  linear conditional expectation for our models, we decided to test these models for homoscedasticity using the Breusch-Pagan test. For our alpha, we chose 0.05 due to the popularity of this threshold value and since we do not have a preference, given our limited background in the study of COVID-19 case analysis. Breusch-Pagan assumes that there is no evidence for heteroscedastic error variance. For all 3 models, we fail to reject the null hypothesis of homoscedasticity, as demonstrated by the below p-value (all p-values are greater than our threshold of 0.05). For this reason and since classical standard errors were larger than robust standard errors for our models, we chose to use classical standard errors to be conservative.
+The CLM assumption of homoscedasticity can also be assessed visually, through the plots of the residuals versus the predicted values used to assess the assumption of linear conditional expectation. In the plots of residuals versus predicted values for model 1 and 2, the distance of the residuals from the fitted line increases toward the center and is lower on the ends where there are fewer data points. Since we failed to reject the null hypothesis of a  linear conditional expectation for our models, we decided to test these models for homoscedasticity using the Breusch-Pagan test. For our alpha, we chose 0.05 due to the popularity of this threshold value and since we do not have a preference, given our limited background in the study of COVID-19 case analysis. Breusch-Pagan assumes that there is no evidence for heteroscedastic error variance. For all 3 models, we fail to reject the null hypothesis of homoscedasticity, as demonstrated by the below p-value (all p-values are greater than our threshold of 0.05). For this reason and since classical standard errors were larger than robust standard errors for our models, we chose to use classical standard errors to be conservative.
 
 ```{r BP Tests, warning=FALSE, echo=FALSE}
 model_1 <- short_model
@@ -436,9 +437,12 @@ shapiro.test(residuals(model_3))
 ## Discussion of Omitted Variables
 In this section we will highlight the five omitted variables that we believe are most important for our model. If possible, we will determine the direction of the omitted variable bias for the independent variables in our model that have statistical significance. We chose to look at only the statistically significant variables because the sign of the coefficient cannot be trusted if there is no statistical significance. The statistically significant variables from our models are: ‘Thursday Retail and Recreation Mobility’, ‘Public Mask Mandate Flag’, ‘Percent Female’, and ‘Percent White’. Below you can find a table that summarizes our results. 
 
-#```{r OV Plot, echo=FALSE, warning=FALSE}
-#knitr::include_graphics("~/w203_lab2_group1/OV_Bias.png")
-#```
+```{r OV Plot, echo=FALSE, warning=FALSE, out.width="100%", fig.align='center'}
+knitr::include_graphics("./OV_Bias.png")
+```
+
+
+
 
 ### Proportion of population without location tracking enabled
 The changes in mobility in our observations are obtained from smartphone devices where the user opted in to location tracking [@Newton]. This definition suggests the omission of one key variable in our model predicting COVID-19 cases by changes in mobility - the proportion of the population without a phone with location tracking enabled. This variable is not captured in the mobility, state policy, or demographic features directly. Additionally, none of the available variables can adequately proxy for this omitted variable. 
