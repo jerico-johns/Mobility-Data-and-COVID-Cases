@@ -1,5 +1,6 @@
 ---
 title: "W203 Lab 2 Report: How Does Moblity Affect COVID-19 Cases"
+author: "Jeff Adams, Brittany Dougall, Li Jin, Jerico Johns"
 output:
   pdf_document: default
   html_notebook: default
@@ -29,7 +30,7 @@ library(knitr)
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.pos = '!h')
 ```
 
-```{r}
+```{r warning=FALSE, echo=FALSE}
 mobility_report <- read.csv("~/w203_lab2_group1/data/raw/mobility_report.csv")
 covid_cases <- read.csv("~/w203_lab2_group1/data/raw/covid_cases.csv")
 df <- read.csv("~/w203_lab2_group1/data/cleaned/df.csv")
