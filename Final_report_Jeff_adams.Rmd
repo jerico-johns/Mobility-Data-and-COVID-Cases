@@ -3,6 +3,7 @@ title: "W203 Lab 2 Report: How Does Moblity Affect COVID-19 Cases"
 output:
   pdf_document: default
   html_notebook: default
+  extra_dependencies: ["flafter"]
 bibliography: ["references.bib"]
 ---
 \inputencoding{utf8}
@@ -24,7 +25,8 @@ library(sandwich)
 library(stargazer)
 library(stats)
 library(png)
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.pos = '!h')
 ```
 
 ```{r}
@@ -43,7 +45,7 @@ We propose exploring a causal relationship between mobility, public mask mandate
 
 How much does a percentage change in mobility impact the percentage change in new COVID-19 cases within a given state, given a $2$ week lag period? 
 
-We choose to use $2$ weeks between mobility & mask mandate and new COVID-19 cases based on the current CDC guidelines [@CDC] suggesting an individual is likely to incubate the disease $2-14$ days after initial symptoms appear (which could be up to $10$ days after initial infection).Thus $2$ weeks after (i.e. days $14$ to $21$) mobility/mask mandate best covers this period of $12$ to $24$ days. 
+We choose to use $2$ weeks (end of the first time period to the beginning of the second time period) between mobility & mask mandate and new COVID-19 cases based on the current CDC guidelines [@CDC] suggesting an individual is likely to incubate the disease $2-14$ days after initial symptoms appear (which could be up to $10$ days after initial infection).Thus $2$ weeks after (i.e. days $21$ to $28$) mobility/mask mandate best covers this period of $12$ to $24$ days with some buffer for discovery of the infection and test turn around times. 
 
 ## Model Building Process
 
@@ -63,7 +65,7 @@ In this section we will define the dependent variable and independent variables,
 
 #### Dependent variable
 
-##### percent_change_in_week_over_week_covid_cases (July 18th - 24th)
+##### percent_change_in_week_over_week_covid_cases (July 19th - 25th)
 
 Percentage change in new COVID cases, comparing the number of new cases from Sunday 07/19/20 - Saturday 07/25/20 vs. Sunday 07/12/20 - Saturday 07/18/20.
 
@@ -192,7 +194,7 @@ corrplot(M, method='circle', title="Figure 1 Mobility variable correlations", ma
 plots <- get_plots(mobility_report, covid_cases, 'California')
 ```
 
-Figure $1, 2$ show that retail, transit and grocery have positive correlation of > $0.70$ (figure $2$) and they tend to move in the same direction (figure $1$). Retail and residential have a negative correlation of $-0.75$  and they tend to move approximately in the opposite direction.
+Figure $1, 2$ show that retail, transit and grocery have positive correlation of > $0.70$ (figure $1$) and they tend to move in the same direction (figure $2$). Retail and residential have a negative correlation of $-0.75$  and they tend to move approximately in the opposite direction.
 
 Since retail mobility is positively correlated with transit and grocery and negatively correlated with residence mobility, we decide to only include one of them as our independent mobility variable. We decide to use retail mobility because we think its practical meaning is the most interesting among all the mobility variables, given the political focus on restaurants and storefronts. We decided not to use workplaces and park mobility variable because $(1)$ parks are outdoor spaces and easier to maintain $6$ foot social distances, and therefore, we don't expect changes in park mobility to cause change in new cases of COVID-19 and $(2)$ for workplaces, generally speaking people have less control of whether to go to workplaces or not, and therefore, this variable does not have sufficient practical impact.
 
@@ -200,7 +202,7 @@ Another observation is that there is no clear correlation between any of the mob
 
 ### Examine the control variables
 
-In this section, we will examine the relationship between control variables (public_mask_mandate_flag, percent_female, percent_white, percent_65_and_older, percent_24_and_younger) and the dependent variable (percent_change_in_week_over_week_covid_cases) for the study time period (July 18th - 24th).
+In this section, we will examine the relationship between control variables (public_mask_mandate_flag, percent_female, percent_white, percent_65_and_older, percent_24_and_younger) and the dependent variable (percent_change_in_week_over_week_covid_cases) for the study time period (July 19th - 25th).
 
 #### Public mask mandate
 
@@ -249,17 +251,25 @@ Based on this, our causal theory is that having a public face mask mandate cause
 
 ### Model Specifications
 
-#### Linear Model
+#### Model One  
+  
+percent_change_in_week_over_week_covid_cases ~  
+percent_change_in_week_over_week_mobility_retail_and_recreation  
+(Sunday, Monday, .. , Saturday)
 
-precent_change_in_week_over_week_covid_cases ~ precent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday)
+#### Model Two  
+  
+percent_change_in_week_over_week_covid_cases ~  
+percent_change_in_week_over_week_mobility_retail_and_recreation  
+(Sunday, Monday, .. , Saturday) + public_mask_mandate_flag
 
-#### Model Two
+#### Model Three  
+  
+percent_change_in_week_over_week_covid_cases ~  
+percent_change_in_week_over_week_mobility_retail_and_recreation  
+(Sunday, Monday, .. , Saturday) + public_mask_mandate_flag + percent_white +  
+percent_female + percent_under_24 +percent_over_65
 
-change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday) + public_mask_mandate_flag
-
-#### Model Three
-
-percent_change_in_week_over_week_covid_cases ~ percent_change_in_week_over_week_mobility_retail_and_recreation (Sunday, Monday, .. , Saturday) + public_mask_mandate_flag + percent_white + percent_female + percent_under_24 + percent_over_65
 
 ## Regression Table
 
@@ -361,7 +371,6 @@ plot_3 <- df %>%
 
 ```
 
-
 #### I.I.D.
 The COVID-19 and mobility observations that our sample is pulled from do not pass the independent assumption requirement of the classic linear model. One contributing factor to the independence violation is state proximity. State observations are not independent due to their proximity to one another. As people travel they can spread the virus across state borders. This can cause the mobility in one state to have an impact on COVID-19 cases in a bordering state. States' COVID-19 policies may be influenced by trends in nearby states. This causes each of our samples to not have true independence. Since we are unable to collect new COVID-19 and state policy observations to sample from, we acknowledge that our findings will be informative of the clusters rather than the population and proceed with our study in spite of this Classical Linear Model (CLM) violation. Regarding the identical distribution requirement of the CLM, we fail to reject the null hypothesis that our sample is taken from identically distributed observations. Our study is taken across a short period of time that is identical for every state, during which the same federal policies are in place. This means that each of our samples are being pulled from the exact same population. In our study, the population is the United states from 6/28/21 to 7/24/21.
 
@@ -369,30 +378,37 @@ The COVID-19 and mobility observations that our sample is pulled from do not pas
 In order to test the collinearity between the predictors in our models, we chose to assess the Variance Inflation Factor (VIF) scores of our respective models. The square root of the VIF score compares the standard error for each predictor to the standard error for that predictor if it was uncorrelated with any other predictor in the model and therefore allows us to determine collinearity between predictors. To calculate VIF scores for our respective models, we used the function summ from the jtools package in R and set the vifs argument to true. The threshold for VIF scores suggestive of problematic multicollinearity differs between statistical texts, with the threshold occurring at a VIF score of $5$ in some sources and a $10$ in others. For our tests, we chose to compare the model scores to a VIF score of $5$ to be conservative. In our interpretation, a VIF score of $5$ or greater suggests moderate to high correlation between model predictors. If found, this correlation can be addressed through eliminating redundant features or through dimension reduction such as PCA analysis. 
 
 The VIF scores for the first model below correspond to those of our base model with only the changes in retail mobility for each day of the week paired observation. All VIF scores are below $2.7$, suggesting although there is some correlation between predictors, the degree of collinearity is not problematic. 
-
+\newpage
 ```{r test for multicollinearity short, warning=FALSE, echo=FALSE}
 # For the short model, all VIF scores are below 5
 # So even though there is some correlation, collinearity is not problematic
 summ(short_model, vifs=TRUE)
 ```
+
 The 2nd test result shows the VIF scores when the predictor for an in-place public mask mandate is added to the model. The VIF scores for the predictors in this model experience small increases but scores continue to remain below 5, suggesting that the addition of the mask mandate flag has not added problematic collinearity.
+\newpage
 ```{r test for multicollinearity medium, warning=FALSE, echo=FALSE}
 # For the medium model, all VIF scores are below 5
 # So even though there is some correlation, collinearity is not problematic
 summ(medium_model, vifs=TRUE)
 ```
+
 When additional demographic predictors were introduced, as seen in the below result,  VIF scores increased, with the highest scores now over $3$. Although scores are still below our threshold of problematic collinearity, the larger scores suggest a greater degree of correlation than in our second model. 
+\newpage
 ```{r test for multicollinearity long, warning=FALSE, echo=FALSE}
 # For the long model, all VIF scores are below 5
 # So even though there is some correlation, collinearity is not problematic
 summ(full_model, vifs=TRUE)
 ```
+
 #### Linear conditional mean
 Since our $2nd$ and $3rd$ models contain multiple predictors, we proceeded to test this CLM assumption in a higher dimensional space - i.e. plotting predictions vs. residuals, as shown below. For the first and second model, the plots show a relatively flat linear trend line around zero and do not appear to have a non-linear pattern - the average residuals change little with the predicted values. The 3rd model has a greater bend in the linear trend line, but still does not show a non-linear pattern between residual and predicted values.  
-```{r Residual Plot 1, warning=FALSE, echo=FALSE}
+```{r Residual Plot 1, warning=FALSE, echo=FALSE, message=FALSE}
 # For the long model, all VIF scores are below 5
 # So even though there is some correlation, collinearity is not problematic
 plot_1
+plot_2
+plot_3
 ```
 Since the plots of residuals versus predicted values do not demonstrate a clear non-linear relationship, we have not found evidence that the addition of additional predictors in the second and third models result in a clear violation of the CLM assumption of linear conditional expectation.
 
@@ -420,7 +436,7 @@ qqnorm(df$model_2_residuals, pch = 1,
 qqline(df$model_2_residuals, col = "steelblue", lwd = 2)
 ```
 
-Conversely, the residuals of the full model with the demographic predictors are more normally distributed, according to the below Q-Q plot (the tails are closer to the qq-line).
+Conversely, the residuals of model 3 with the demographic predictors are more normally distributed, according to the below Q-Q plot (the tails are closer to the qq-line).
 
 ```{r Q-Q Plots 3, warning=FALSE, echo=FALSE}
 # Q-Q Plot of Full Model Residuals
@@ -441,7 +457,9 @@ shapiro.test(residuals(model_3))
 ```
 
 ## Discussion of Omitted Variables
-In this section we will highlight the five omitted variables that we believe are most important for our model. If possible, we will determine the direction of the omitted variable bias for the independent variables in our model that have statistical significance. We chose to look at only the statistically significant variables because the sign of the coefficient cannot be trusted if there is no statistical significance. The statistically significant variables from our models are: 'Thursday Retail and Recreation Mobility', 'Public Mask Mandate Flag', 'Percent Female', and 'Percent White'. Below you can find a table that summarizes our results. 
+In this section we will highlight the five omitted variables that we believe are most important for our model. If possible, we will determine the direction of the omitted variable bias for the independent variables in our model that have statistical significance. We chose to look at only the statistically significant variables because the sign of the coefficient cannot be trusted if there is no statistical significance. The statistically significant variables from our models are: 'Thursday Retail and Recreation Mobility', 'Public Mask Mandate Flag', 'Percent Female', and 'Percent White'. Below you can find a summary of our results in Table 1. 
+
+## Table 1:
 
 ```{r OV Plot, echo=FALSE, warning=FALSE, out.width="100%", fig.align='center'}
 knitr::include_graphics("./OV_Bias.png")
