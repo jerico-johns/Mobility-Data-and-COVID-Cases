@@ -209,6 +209,8 @@ In this section, we will examine the relationship between control variables (pub
 
 Looking at the box plot for percent change in COVID-19 cases group by public mask mandate variable for the $51$ states (Figure 3), we see that there is a slight higher mean in percent change in COVID-19 cases in states without public mask mandate than with one. We decide to include this control variable and further examine its coefficient and p-value.
 
+Note that the outlier in Figure 3 is Hawaii because fewer tests were conducted over the weekend amidst a hurricane threat. We decided to include this in the regression because there was also a cluster of cases linked to failure to comply with face mask mandates and we don't know how many cases were impacted by the reporting delay.
+
 ``` {r, warning=FALSE, echo=FALSE}
 df %>% ggplot(aes(x=public_mask_mandate_flag, group=public_mask_mandate_flag, y=p1_p2_percent_change_in_cases)) + geom_boxplot() + ylab("% change in covid cases") + xlab("State-wide Public mask mandate (0 means no mandate)") + ggtitle("Figure 3: \n change in covid cases with/without public mask mandate")
 ```
